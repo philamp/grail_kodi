@@ -1,0 +1,28 @@
+<addon id="context.kodi_grail"
+       name="Kodi Grail Context Menu"
+       version="1.0.3"
+       provider-name="You">
+
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+  </requires>
+
+  <!-- ton menu contextuel -->
+  <extension point="kodi.context.item">
+    <menu id="kodi.core.main">
+      <item library="resources/lib/contextitem.py" condition="true">
+        <label>Play with Grail</label>
+        <visible>true</visible>
+      </item>
+    </menu>
+  </extension>
+
+  <!-- le service qui force Kodi à initialiser le gestionnaire -->
+  <extension point="xbmc.service" library="init_context.py" start="startup" />
+
+  <extension point="xbmc.addon.metadata">
+    <summary>Stable Grail context menu</summary>
+    <description>Forces initialization of context menu manager like Jellyfin/Plex.</description>
+    <platform>all</platform>
+  </extension>
+</addon>
