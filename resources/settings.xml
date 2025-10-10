@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<settings version="1">
+	<section id="context.kodi_grail">
+		<category id="general" label="" help="">
+			<group id="1" label="JG Server">
+				<setting id="jg_host" type="string" label="JG host">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>false</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <heading>Heading</heading>
+                    </control>
+				</setting>
+			</group>
+		</category>
+	</section>
+</settings>
