@@ -1,0 +1,56 @@
+# Kodi Media Center language file
+msgid ""
+msgstr ""
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgctxt "Addon Summary"
+msgid ".po string for summary"
+msgstr ""
+
+msgctxt "Addon Description"
+msgid ".po string for Descritpion"
+msgstr ""
+
+msgctxt "#30128"
+msgid "Connections"
+msgstr ""
+
+msgctxt "#30004"
+msgid "IP"
+msgstr ""
+
+msgctxt "#30005"
+msgid "WebService Port"
+msgstr ""
+
+msgctxt "#30012"
+msgid "MySQL Port"
+msgstr ""
+
+msgctxt "#30006"
+msgid "JellyGrail WebService"
+msgstr ""
+
+msgctxt "#30007"
+msgid "JellyGrail MySQL Service"
+msgstr ""
+
+msgctxt "#30008"
+msgid "MySQL Username"
+msgstr ""
+
+msgctxt "#30009"
+msgid "MySQL Password"
+msgstr ""
+
+msgctxt "#30010"
+msgid "MySQL DB Name"
+msgstr ""
+
+msgctxt "#30011"
+msgid "JellyGrail Server"
+msgstr ""

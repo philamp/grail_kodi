@@ -1,18 +1,73 @@
 <?xml version="1.0" ?>
-<settings version="1">
+<settings version="2">
 	<section id="context.kodi_grail">
-		<category id="general" label="" help="">
-			<group id="1" label="JG Server">
-				<setting id="jg_host" type="string" label="JG host">
+		<category id="general" label="30128" help="">
+            <group id="1" label="30011">
+                <setting id="jgip" type="string" label="30004">
                     <level>0</level>
                     <default/>
                     <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <default>172.22.2.222</default>
+                    <control type="edit" format="ip">
+                        <heading/>
+                    </control>
+                </setting>
+            </group>
+			<group id="2" label="30006">
+                <setting id="jgport" type="integer" label="30005">
+                    <level>0</level>
+                    <constraints>
                         <allowempty>false</allowempty>
                     </constraints>
-                    <control type="edit" format="string">
-                        <heading>Heading</heading>
+                    <default>0</default>
+                    <control type="edit" format="integer">
+                        <heading/>
                     </control>
-				</setting>
+                </setting>
+			</group>
+			<group id="3" label="30007">
+                <setting id="sqlport" type="integer" label="30012">
+                    <level>0</level>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <default>0</default>
+                    <control type="edit" format="integer">
+                        <heading/>
+                    </control>
+                </setting>
+                <setting id="sqldbname" type="string" label="30010">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <heading/>
+                    </control>
+                </setting>
+                <setting id="sqlusername" type="string" label="30008">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <heading/>
+                    </control>
+                </setting>
+                <setting id="sqlpassword" type="string" label="30009">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <heading/>
+                    </control>
+                </setting>
 			</group>
 		</category>
 	</section>
