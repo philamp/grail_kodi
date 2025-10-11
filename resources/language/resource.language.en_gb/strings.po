@@ -36,7 +36,7 @@ msgid "JellyGrail WebService"
 msgstr ""
 
 msgctxt "#30007"
-msgid "JellyGrail MySQL Service"
+msgid "JellyGrail MySQL"
 msgstr ""
 
 msgctxt "#30008"
@@ -53,4 +53,28 @@ msgstr ""
 
 msgctxt "#30011"
 msgid "JellyGrail Server"
+msgstr ""
+
+msgctxt "#30013"
+msgid "Advanced"
+msgstr ""
+
+msgctxt "#30015"
+msgid "Debug"
+msgstr ""
+
+msgctxt "#30014"
+msgid "Debug mode"
+msgstr ""
+
+msgctxt "#30016"
+msgid "Overrides"
+msgstr ""
+
+msgctxt "#30017"
+msgid "Settings in manual mode"
+msgstr ""
+
+msgctxt "#30021"
+msgid "comp string"
 msgstr ""

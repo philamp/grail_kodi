@@ -22,7 +22,7 @@ def patch_advancedsettings_mysql(host, user, password, dbnameprefix, port=6503):
     <user>{user}</user>
     <pass>{password}</pass>
     <name>{dbnameprefix}</name>
-    </videodatabase>"""
+</videodatabase>"""
 
     if xbmcvfs.exists(adv_path):
         with xbmcvfs.File(adv_path) as f:
@@ -162,7 +162,7 @@ def join_multicast(sock, mcast_addr="239.255.255.250"):
 # ==============================
 #  Écoute SSDP (avec durée limitée)
 # ==============================
-def listen_ssdp(port=6505, mcast_addr="239.255.255.250", duration=20):
+def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
     VERSION="20250808"
     """
     Écoute les messages SSDP multicast sur le port spécifié pendant `duration` secondes.
@@ -184,7 +184,7 @@ def listen_ssdp(port=6505, mcast_addr="239.255.255.250", duration=20):
         sock.setblocking(False)
         xbmc.log(f"[context.kodi_grail] SSDP listener started on {mcast_addr}:{port}, duration={duration}s", xbmc.LOGINFO)
 
-        monitor = xbmc.Monitor()
+        #monitor = xbmc.Monitor()
         end_time = None if duration == 0 else (time.time() + float(duration))
 
         while True:
@@ -209,6 +209,7 @@ def listen_ssdp(port=6505, mcast_addr="239.255.255.250", duration=20):
                     msg = data.decode(errors="ignore").strip()
                     xbmc.log(f"[context.kodi_grail] SSDP from {addr}: {msg}", xbmc.LOGINFO)
                     msga = msg.split("|")
+
                     if len(msg) and msga[0] == "JGx":
                         if msga[1] != VERSION:
                             xbmcgui.Dialog().notification(
@@ -222,12 +223,20 @@ def listen_ssdp(port=6505, mcast_addr="239.255.255.250", duration=20):
                         else:
 
                             # we store what we already have in SSDP message:
-                            addon = xbmcaddon.Addon(id="context.kodi_grail")
-                            addon.setSetting("jgip", addr[0])
-                            addon.setSetting("jgport", msga[3])
-                            addon.setSetting("sqlport", msga[4])
+                            #addon = xbmcaddon.Addon(id="context.kodi_grail")
+                            monitor.set_silent() #to avoid loop
 
-                            #dbname, user, pass to be fetched
+                            monitor.addon.setSetting("jgip", addr[0])
+                            xbmc.log("[context.kodi_grail]jgip:", xbmc.LOGINFO)
+                            monitor.addon.setSetting("jgport", msga[3])
+                            xbmc.log("[context.kodi_grail]jgport:", xbmc.LOGINFO)
+                            monitor.addon.setSetting("sqlport", msga[4])
+                            xbmc.log("[context.kodi_grail]sqlport:", xbmc.LOGINFO)
+                            monitor.onSettingsChanged() #called manually
+
+                            monitor.set_not_silent()
+
+                            #dbname, user, pass to be fetched from server
 
 
                             xbmcgui.Dialog().notification(
@@ -249,15 +258,15 @@ def listen_ssdp(port=6505, mcast_addr="239.255.255.250", duration=20):
                         
                         
                         xbmcgui.Dialog().notification(
-                            "KodiGrail",
-                            f"Step2: SSDP Failed, you have to manually configure the add-on"
+                            "KodiGrail| S2: SSDP",
+                            f"Failed, you have to manually configure the add-on"
                         )
 
                     if addr[0] != msga[2]:
                         xbmc.log(f"[context.kodi_grail] Warning: IP mismatch between UDP source {addr[0]} and message {msga[2]}", xbmc.LOGWARNING)
                         xbmcgui.Dialog().notification(
                             "KodiGrail| S2: SSDP",
-                            f"Step 2.5 - IP mismatch between SSDP and JellyGrail message: {addr[0]} != {msga[2]}",
+                            f"IP mismatch between SSDP and JellyGrail message: {addr[0]} != {msga[2]}",
                         )
 
                     break
@@ -274,43 +283,102 @@ def listen_ssdp(port=6505, mcast_addr="239.255.255.250", duration=20):
         xbmc.log("[context.kodi_grail] SSDP listener stopped", xbmc.LOGINFO)
 
 class GrailMonitor(xbmc.Monitor):
-    def __init__(self):
+
+
+
+    def __init__(self, addon):
         super().__init__()
-        self.addon = xbmcaddon.Addon(id="context.kodi_grail")
+        self.addon = addon
+        self._ignore_changes = False
+
+    def set_silent(self):
+        self._ignore_changes = True
+
+    def set_not_silent(self):
+        self._ignore_changes = False
+
 
     def onSettingsChanged(self):
-        ip = self.addon.getSettingString("jgip")
-        xbmcgui.Dialog().notification(
-            "KodiGrail| SETTING CHANGED",
-            f"SETTING CHANGED",
-        )
-        # poc patch_advancedsettings_mysql patch_advancedsettings_mysql(host, user, password, dbnameprefix, port=6503):
-        xbmc.log(f"[context.kodi_grail] ONSETTINGHCANGED CALLED AGAIN", xbmc.LOGINFO)
-        patch_advancedsettings_mysql(ip, self.addon.getSettingString("sqlusername") or "kodi", self.addon.getSettingString("sqlpassword") or "kodi", self.addon.getSettingString("sqldbname") or "kodi_video", self.addon.getSettingInt("sqlport") or 6503)
-        # store a hash of the settings to detect changes on next startup
-        settings_str = f"{ip}|{self.addon.getSettingString('sqlusername')}|{self.addon.getSettingString('sqlpassword')}|{self.addon.getSettingString('sqldbname')}|{str(self.addon.getSettingInt('sqlport'))}"
 
-        #self.addon.setSetting("settings_str", settings_str) -> absolutely not needed
+        changes = False
+
+        if self._ignore_changes:
+            xbmc.log("[context.kodi_grail] above var silently set", xbmc.LOGINFO)
+            return
+        
+
+        ip = self.addon.getSettingString("jgip")
+        
+        #xbmcgui.Dialog().notification(
+        #    "KodiGrail| SETTING CHANGED",
+        #    f"in kodi UI or called in script"
+        #)
+
+        #compare with previous settings
+        next_override_str = str(self.addon.getSettingBool("override_ssdp_settings")) or "False"
+        xbmcgui.Dialog().notification(
+            "KodiGrail| debug value bool",
+            f"nos={next_override_str}"
+        )
+
+
+
+        prev_settings_str = self.addon.getSettingString("settings_str") or "|||0"
+        next_settings_str = f"{self.addon.getSettingString('jgip')}|{self.addon.getSettingString('sqlusername')}|{self.addon.getSettingString('sqlpassword')}|{self.addon.getSettingString('sqldbname')}|{str(self.addon.getSettingInt('sqlport'))}"
+        
+
+        xbmc.log(f"[context.kodi_grail] suposed to be changed : {next_settings_str}", xbmc.LOGINFO)
+
+        # if override_ssdp_setting is true AND changed -> we do not patch
+        if (prev_settings_str == next_settings_str) and (next_override_str == self.addon.getSettingString("override_str")):
+            xbmcgui.Dialog().notification(
+                "KodiGrail| NO CHANGE",
+                f"NO CHANGE"
+            )
+        else:
+            xbmcgui.Dialog().notification(
+                "KodiGrail| !CHANGES",
+                f"!CHANGES"
+            )
+            changes = True
+            patch_advancedsettings_mysql(ip, self.addon.getSettingString("sqlusername") or "kodi", self.addon.getSettingString("sqlpassword") or "kodi", self.addon.getSettingString("sqldbname") or "kodi_video", self.addon.getSettingInt("sqlport") or 6503)
+            
+            self.set_silent() #to avoid loop
+
+            xbmc.log("[context.kodi_grail]settings_str:", xbmc.LOGINFO)
+            self.addon.setSetting("settings_str", next_settings_str)
+            xbmc.log("[context.kodi_grail]override_str:", xbmc.LOGINFO)
+            self.addon.setSetting("override_str", next_override_str)
+
+            self.set_not_silent()
+
+            xbmcgui.Dialog().ok("Kodi Grail", "Please restart Kodi to apply new settings")
 
 # ==============================
 #  Point d'entrée principal
 # ==============================
 if __name__ == "__main__":
     preload_context()
-    
+    addon = xbmcaddon.Addon(id="context.kodi_grail")
+    monitor = GrailMonitor(addon)
+
     xbmcgui.Dialog().notification(
-        "KodiGrail| S1:Loading",
+        "KodiGrail| S1: Loading",
         "Success"
     )
+    if addon.getSettingBool("override_ssdp_settings"):
+        xbmcgui.Dialog().notification(
+            "KodiGrail| S2: SSDP ignored",
+            f"Manual settings used"
+        )
+    else:
+        thread = threading.Thread(target=listen_ssdp, kwargs={'monitor': monitor, 'port': 6505, 'mcast_addr': "239.255.255.250", 'duration': 20}, daemon=True)
+        thread.start()
 
-    # Lancer l’écoute SSDP dans un thread séparé pour 20 secondes
-    thread = threading.Thread(target=listen_ssdp, kwargs={'port': 6505, 'mcast_addr': "239.255.255.250", 'duration': 20}, daemon=True)
-    thread.start()
-
-    xbmc.log("[context.kodi_grail] init_context service started", xbmc.LOGINFO)
+    #xbmc.log("[context.kodi_grail] init_context service started", xbmc.LOGINFO)
 
     # On attend la fin du service ou l'arrêt Kodi (la boucle principale reste utile si tu veux garder le service vivant)
-    monitor = GrailMonitor()
+    
     while not monitor.abortRequested():
         xbmc.sleep(500)
 
