@@ -27,28 +27,8 @@ msgctxt "#30005"
 msgid "WebService Port"
 msgstr ""
 
-msgctxt "#30012"
-msgid "MySQL Port"
-msgstr ""
-
 msgctxt "#30006"
 msgid "JellyGrail WebService"
-msgstr ""
-
-msgctxt "#30007"
-msgid "JellyGrail MySQL"
-msgstr ""
-
-msgctxt "#30008"
-msgid "MySQL Username"
-msgstr ""
-
-msgctxt "#30009"
-msgid "MySQL Password"
-msgstr ""
-
-msgctxt "#30010"
-msgid "MySQL DB Name"
 msgstr ""
 
 msgctxt "#30011"
@@ -73,8 +53,4 @@ msgstr ""
 
 msgctxt "#30017"
 msgid "Settings in manual mode"
-msgstr ""
-
-msgctxt "#30021"
-msgid "comp string"
 msgstr ""

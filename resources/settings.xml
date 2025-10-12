@@ -2,17 +2,16 @@
 <settings version="2">
 	<section id="context.kodi_grail">
 		<category id="general" label="30128" help="">
-            <group id="0" label="30016">
-				<setting id="override_ssdp_settings" type="boolean" label="30017" help="">
+            <group id="1" label="30016">
+				<setting id="override_ssdp_settings" type="boolean" label="30017">
 					<level>0</level>
 					<default>false</default>
 					<control type="toggle"/>
 				</setting>
             </group>
-            <group id="1" label="30011">
+            <group id="2" label="30011">
                 <setting id="jgip" type="string" label="30004">
                     <level>0</level>
-                    <default/>
 					<dependencies>
 						<dependency type="enable">
 							<condition operator="is" setting="override_ssdp_settings">true</condition>
@@ -21,7 +20,7 @@
                     <constraints>
                         <allowempty>true</allowempty>
                     </constraints>
-                    <default>172.22.2.222</default>
+                    <default>0.0.0.0</default>
                     <control type="edit" format="ip">
                         <heading/>
                     </control>
@@ -42,69 +41,7 @@
                     </control>
                 </setting>
             </group>
-			<group id="2" label="30007">
-                <setting id="sqlport" type="integer" label="30012">
-                    <level>0</level>
-                    <constraints>
-                        <allowempty>true</allowempty>
-                    </constraints>
-                    <default>0</default>
-					<dependencies>
-						<dependency type="enable">
-							<condition operator="is" setting="override_ssdp_settings">true</condition>
-						</dependency>
-					</dependencies>
-                    <control type="edit" format="integer">
-                        <heading/>
-                    </control>
-                </setting>
-                <setting id="sqldbname" type="string" label="30010">
-                    <level>0</level>
-                    <default/>
-					<dependencies>
-						<dependency type="enable">
-							<condition operator="is" setting="override_ssdp_settings">true</condition>
-						</dependency>
-					</dependencies>
-                    <constraints>
-                        <allowempty>true</allowempty>
-                    </constraints>
-                    <control type="edit" format="string">
-                        <heading/>
-                    </control>
-                </setting>
-                <setting id="sqlusername" type="string" label="30008">
-                    <level>0</level>
-                    <default/>
-					<dependencies>
-						<dependency type="enable">
-							<condition operator="is" setting="override_ssdp_settings">true</condition>
-						</dependency>
-					</dependencies>
-                    <constraints>
-                        <allowempty>true</allowempty>
-                    </constraints>
-                    <control type="edit" format="string">
-                        <heading/>
-                    </control>
-                </setting>
-                <setting id="sqlpassword" type="string" label="30009">
-                    <level>0</level>
-                    <default/>
-					<dependencies>
-						<dependency type="enable">
-							<condition operator="is" setting="override_ssdp_settings">true</condition>
-						</dependency>
-					</dependencies>
-                    <constraints>
-                        <allowempty>true</allowempty>
-                    </constraints>
-                    <control type="edit" format="string">
-                        <heading/>
-                    </control>
-                </setting>
-			</group>
-		</category>
+        </category>
         <category id="advanced" label="30013" help="">
             <group id="1" label="30015">
 				<setting id="debug_mode" type="boolean" label="30014" help="">
@@ -112,26 +49,6 @@
 					<default>true</default>
 					<control type="toggle"/>
 				</setting>
-                <setting id="settings_str" type="string" label="30021">
-                    <level>0</level>
-                    <default/>
-                    <constraints>
-                        <allowempty>true</allowempty>
-                    </constraints>
-                    <control type="edit" format="string">
-                        <heading/>
-                    </control>
-                </setting>
-                <setting id="override_str" type="string" label="30021">
-                    <level>0</level>
-                    <default/>
-                    <constraints>
-                        <allowempty>true</allowempty>
-                    </constraints>
-                    <control type="edit" format="string">
-                        <heading/>
-                    </control>
-                </setting>
             </group>
         </category>
 	</section>
