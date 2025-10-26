@@ -12,6 +12,9 @@ import time
 import zipfile
 import urllib.request
 import uuid
+import json
+
+VERSION="20250808"
 
 def get_installation_uid(addon):
     install_path = xbmcvfs.translatePath(addon.getAddonInfo("path"))
@@ -73,10 +76,13 @@ def kodi_version():
     return kodi_major
 
 
-def select_mysql_db(dbs):
+def select_mysql_db(dbs, puid):
     if not dbs:
         return None
     dialog = xbmcgui.Dialog()
+
+    
+
     index = dialog.select("Choisir une base MySQL", dbs)
     if index >= 0:
         return dbs[index]
@@ -85,19 +91,14 @@ def select_mysql_db(dbs):
 def fetch_mysql_dbs(url):
     try:
         xbmc.log(f"[context.kodi_grail] Requête JellyGrail : {url}", xbmc.LOGINFO)
-        #with urllib.request.urlopen(url, timeout=5) as response:
-            #data = response.read().decode("utf-8")
-        #result = json.loads(data)
-        result = {"databases": ["movies_db", "tvshows_db", "music_db"]}  # Simulé pour l'exemple
+        with urllib.request.urlopen(url, timeout=5) as response:
+            data = response.read().decode("utf-8")
+        result = json.loads(data)
+        #result = {"databases": ["movies_db", "tvshows_db", "music_db"]}  # Simulé pour l'exemple
         
-        build = xbmc.getInfoLabel("System.BuildVersion")
+        return [entry.get("dbname") for uid, entry in result.items()]
 
-        if isinstance(result, list):
-            return result
-        elif "databases" in result:
-            return result["databases"]
-        else:
-            return []
+
     except Exception as e:
         xbmc.log(f"[context.kodi_grail] Erreur JellyGrail fetch : {e}", xbmc.LOGERROR)
         return []
@@ -189,11 +190,14 @@ def join_multicast(sock, mcast_addr="239.255.255.250"):
 #  Écoute SSDP (avec durée limitée)
 # ==============================
 def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
-    VERSION="20250808"
+    
     """
     Écoute les messages SSDP multicast sur le port spécifié pendant `duration` secondes.
     duration=0  => écoute indéfiniment (ou jusqu'à arrêt Kodi).
     """
+
+    kodiverison = kodi_version()
+
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -287,6 +291,7 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
                                 xbmc.sleep(500)
 
                                 monitor.set_not_silent()
+
                             else:
                                 xbmcgui.Dialog().notification(
                                     "KodiGrail| S3: Base settings",
@@ -330,12 +335,12 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
 
                             
 
-                            dbs = fetch_mysql_dbs("http://jellygrailserver.local/databases")
+                            dbs = fetch_mysql_dbs(f"http://{addr[0]}:{msga[3]}/get_compatible_kodiDBs?kodi_version={kodiverison}&uid={uuid}")
                             if not dbs:
                                 xbmcgui.Dialog().ok("Kodi Grail", "Aucune base MySQL trouvée.")
                                 return
 
-                            selected = select_mysql_db(dbs)
+                            selected = select_mysql_db(dbs, uuid)
                             if selected:
                                 xbmcgui.Dialog().ok("Kodi Grail", f"Base sélectionnée : [B]{selected}[/B]")
                                 xbmc.log(f"[context.kodi_grail] Base MySQL sélectionnée : {selected}", xbmc.LOGINFO)
@@ -406,7 +411,7 @@ class GrailMonitor(xbmc.Monitor):
             xbmc.log("[context.kodi_grail] above var silently set", xbmc.LOGINFO)
             return
         
-        # if not silently set:
+        # if not silently set = if set in config
         askUserRestart()
 
 # ==============================

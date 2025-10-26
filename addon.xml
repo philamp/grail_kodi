@@ -11,7 +11,7 @@
   <extension point="kodi.context.item">
     <menu id="kodi.core.main">
       <item library="resources/lib/contextitem.py" condition="true">
-        <label>Play with Grail</label>
+        <label>}{ Actions !</label>
         <visible>true</visible>
       </item>
     </menu>

@@ -15,7 +15,7 @@ def run():
     addon = xbmcaddon.Addon()
     xbmcgui.Dialog().notification(
         "Kodi Grail",
-        "Play with Grail clicked!",
+        "}{ Actions clicked",
         icon=addon.getAddonInfo("icon"),
         time=3000
     )
