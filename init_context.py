@@ -96,7 +96,7 @@ def fetch_mysql_dbs(url):
         result = json.loads(data)
         #result = {"databases": ["movies_db", "tvshows_db", "music_db"]}  # Simulé pour l'exemple
         
-        return [entry.get("dbname") for uid, entry in result.items()]
+        return [entry.get("db_created_date") for uid, entry in result.items()]
 
 
     except Exception as e:
@@ -335,7 +335,7 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
 
                             
 
-                            dbs = fetch_mysql_dbs(f"http://{addr[0]}:{msga[3]}/get_compatible_kodiDBs?kodi_version={kodiverison}&uid={uuid}")
+                            dbs = fetch_mysql_dbs(f"http://{addr[0]}:{msga[3]}/api/get_compatible_kodiDBs?token={ssdp_token}&kodi_version={kodiverison}&uid={uuid}")
                             if not dbs:
                                 xbmcgui.Dialog().ok("Kodi Grail", "Aucune base MySQL trouvée.")
                                 return
