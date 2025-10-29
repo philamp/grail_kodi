@@ -54,3 +54,7 @@ msgstr ""
 msgctxt "#30017"
 msgid "Settings in manual mode"
 msgstr ""
+
+msgctxt "#30018"
+msgid "JellyGrail token"
+msgstr ""

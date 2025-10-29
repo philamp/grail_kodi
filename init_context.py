@@ -75,31 +75,70 @@ def kodi_version():
     xbmc.log(f"[context.kodi_grail] Version Kodi détectée : {build}", xbmc.LOGINFO)
     return kodi_major
 
-
-def select_mysql_db(dbs, puid):
-    if not dbs:
-        return None
-    dialog = xbmcgui.Dialog()
-
-    
-
-    index = dialog.select("Choisir une base MySQL", dbs)
-    if index >= 0:
-        return dbs[index]
-    return None
-
-def fetch_mysql_dbs(url):
+def send_choice_to_server(url):
     try:
-        xbmc.log(f"[context.kodi_grail] Requête JellyGrail : {url}", xbmc.LOGINFO)
+        xbmc.log(f"[context.kodi_grail] Requête JellyGrail SET : {url}", xbmc.LOGINFO)
         with urllib.request.urlopen(url, timeout=5) as response:
             data = response.read().decode("utf-8")
         result = json.loads(data)
         #result = {"databases": ["movies_db", "tvshows_db", "music_db"]}  # Simulé pour l'exemple
-        
-        return [entry.get("db_created_date") for uid, entry in result.items()]
+        if result.get("status") == 200:
+            return True
+        else:
+            xbmcgui.Dialog().notification(
+                "KodiGrail| DBs info fetch error",
+                f"Unable to set DB",
+                xbmcgui.NOTIFICATION_INFO,
+                1500
+            )
+            xbmc.log(f"[context.kodi_grail] Erreur JellyGrail set db to server", xbmc.LOGERROR)
+            return False
 
 
     except Exception as e:
+        xbmcgui.Dialog().notification(
+            "KodiGrail| DBs info fetch error",
+            f"Unable to set DB, critical",
+            xbmcgui.NOTIFICATION_INFO,
+            1500
+        )
+        xbmc.log(f"[context.kodi_grail] Erreur JellyGrail set deb to server : {e}", xbmc.LOGERROR)
+        return False
+
+def select_mysql_db(dbs):
+    if not dbs:
+        return None
+    dialog = xbmcgui.Dialog()
+
+    dbs_label = [val.get("db_created_date") for _, val in dbs.items()]
+    dbs_name = [val.get("dbname") for _, val in dbs.items()]
+
+    if len(dbs_name) < 2:
+        xbmcgui.Dialog().ok("Kodi Grail", f"Base sélectionnée : [B]{dbs_label[0]}[/B]")
+        return dbs_name[0]
+
+    index = dialog.select("Choisir une base MySQL", dbs_label)
+    if index >= 0:
+        return dbs_name[index]
+
+    return None
+
+def fetch_mysql_info(url):
+    try:
+        xbmc.log(f"[context.kodi_grail] Requête JellyGrail GET: {url}", xbmc.LOGINFO)
+        with urllib.request.urlopen(url, timeout=5) as response:
+            data = response.read().decode("utf-8")
+        result = json.loads(data)
+        return result
+
+
+    except Exception as e:
+        xbmcgui.Dialog().notification(
+            "KodiGrail| DBs info fetch error",
+            f"Unable to receive info about available DBs, critical",
+            xbmcgui.NOTIFICATION_INFO,
+            1500
+        )
         xbmc.log(f"[context.kodi_grail] Erreur JellyGrail fetch : {e}", xbmc.LOGERROR)
         return []
 
@@ -162,24 +201,33 @@ def preload_context():
         xbmc.log(f"[context.kodi_grail] preload failed: {e}", xbmc.LOGERROR)
 
 
+def guess_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        iface_ip = s.getsockname()[0]
+    except Exception:
+        iface_ip = "0.0.0.0"
+    finally:
+        s.close()
+    return iface_ip
+
 # ==============================
 #  Gestion du multicast (universelle)
 # ==============================
 def join_multicast(sock, mcast_addr="239.255.255.250"):
-    """Joint le groupe multicast, compatible Android, webOS, CoreELEC, etc."""
-    try:
-        # Détection de l'adresse IP locale active (pour Android notamment)
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        iface_ip = s.getsockname()[0]
-        s.close()
-    except Exception:
-        iface_ip = "0.0.0.0"
+
+    iface_ip = guess_ip()
 
     try:
-        mreq = struct.pack("4s4s",
+        if iface_ip != "0.0.0.0":
+            mreq = struct.pack("4s4s",
+                            socket.inet_aton(mcast_addr),
+                            socket.inet_aton(iface_ip))
+        else:
+            mreq = struct.pack("4sl",
                            socket.inet_aton(mcast_addr),
-                           socket.inet_aton(iface_ip))
+                           socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         xbmc.log(f"[context.kodi_grail] joined multicast group {mcast_addr} on {iface_ip}", xbmc.LOGINFO)
     except Exception as e:
@@ -264,7 +312,7 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
 
                             # --- SSDP to official kodi settings storage ---
 
-                            if monitor.addon.getSettingString("jgip") != addr[0] or monitor.addon.getSettingInt("jgport") != int(msga[3]):
+                            if monitor.addon.getSettingString("jgip") != addr[0] or monitor.addon.getSettingInt("jgport") != int(msga[3]) or monitor.addon.getSettingString("jgtoken") != msga[6]:
                                 xbmcgui.Dialog().notification(
                                     "KodiGrail| S3: Base settings",
                                     f"Updating settings...",
@@ -281,12 +329,12 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
                                 # 1 - JGIP
                                 if monitor.addon.getSettingString("jgip") != addr[0]:
                                     monitor.addon.setSetting("jgip", addr[0])
-                                    xbmc.log("[context.kodi_grail]jgip:", xbmc.LOGINFO)
-
                                 # 2 - JGPORT
                                 if monitor.addon.getSettingInt("jgport") != int(msga[3]):
                                     monitor.addon.setSetting("jgport", msga[3])
-                                    xbmc.log("[context.kodi_grail]jgport:", xbmc.LOGINFO)
+                                # 3 - Token
+                                if monitor.addon.getSettingString("jgtoken") != msga[6]:
+                                    monitor.addon.setSetting("jgtoken", msga[6])
 
                                 xbmc.sleep(500)
 
@@ -308,7 +356,6 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
                             
 
                             # we get the rest via WS and we give the token given by SSDP
-                            # we have the port for SQL in SSDP -> advsettings
 
                             # WS design is:
                             # - POST to /kodi_login with add-on instance UUDID
@@ -318,32 +365,48 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=20):
                             # - and KODI version
                             kodiverison = kodi_version()
 
+                            local_ip = guess_ip()
+
+                            # we have the port for SQL in SSDP -> advsettings
                             xbmc.log(f"[context.kodi_grail] UUID:{uuid}, SSDP_TOKEN: {ssdp_token}, kodiverison: {kodiverison}", xbmc.LOGINFO)
+
+                            BASE_URL = f"http://{addr[0]}:{msga[3]}/api"
+
+                            BASE_IDENT = f"?token={ssdp_token}&kodi_version={kodiverison}&uid={uuid}&ip={local_ip}"
                             
+                            ##uid##choice##ip##kodi_version
                             # - JG responds with a list(S) of possible databases + new db (or just one if it recognizes the UUID)
                             # - so the seed is always given by JG
                             # - (we select one if many) and store it in advsettings.xml
 
+                            jginfo = fetch_mysql_info(f"{BASE_URL}/get_compatible_kodiDBs{BASE_IDENT}")
+                            if not jginfo:
+                                xbmcgui.Dialog().ok("Kodi Grail", "No DB returned by the server.")
+                                return
+                            if dbs := jginfo.get("avail_dbs"):
+                                selected = select_mysql_db(dbs)
+                            if selected:
+                                send_choice_to_server(f"{BASE_URL}/set_db_for_this_kodi{BASE_IDENT}&choice={selected}")
+                                xbmc.log(f"[context.kodi_grail] Selected DB : {selected}", xbmc.LOGINFO)
+                            '''
+                            jginfo = {
+                                "version": VERSION,
+                                "port": KODI_MYSQL_CONFIG.get('port', 0),
+                                "user": KODI_MYSQL_CONFIG.get('user', "0"), 
+                                "pwd": KODI_MYSQL_CONFIG.get('password', "0")
+                            }
+                            '''
 
-
-
+                            if mysqlinfo := jginfo.get("jginfo"):
                             # - when storing in advanced settings, we check for changes, if changes, we ask for a restart of Kodi
                             # host, user, password, dbnameprefix, port):
-                            # this is a POC
-                            if patch_advancedsettings_mysql(addr[0], "kodi", "kodi", "kodi_video", msga[4]):
-                                askUserRestart("(userdata/advancedsettings.xml updated)")
+                                # this is a POC
+                                if patch_advancedsettings_mysql(addr[0], mysqlinfo.get("user"), mysqlinfo.get("pwd"), selected, mysqlinfo.get("port")):
+                                    askUserRestart("(userdata/advancedsettings.xml updated)")
 
                             
 
-                            dbs = fetch_mysql_dbs(f"http://{addr[0]}:{msga[3]}/api/get_compatible_kodiDBs?token={ssdp_token}&kodi_version={kodiverison}&uid={uuid}")
-                            if not dbs:
-                                xbmcgui.Dialog().ok("Kodi Grail", "Aucune base MySQL trouvée.")
-                                return
 
-                            selected = select_mysql_db(dbs, uuid)
-                            if selected:
-                                xbmcgui.Dialog().ok("Kodi Grail", f"Base sélectionnée : [B]{selected}[/B]")
-                                xbmc.log(f"[context.kodi_grail] Base MySQL sélectionnée : {selected}", xbmc.LOGINFO)
 
                     else:
                         

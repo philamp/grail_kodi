@@ -40,6 +40,21 @@
                         <heading/>
                     </control>
                 </setting>
+                <setting id="jgtoken" type="string" label="30018">
+                    <level>0</level>
+					<dependencies>
+						<dependency type="enable">
+							<condition operator="is" setting="override_ssdp_settings">true</condition>
+						</dependency>
+					</dependencies>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <default>0</default>
+                    <control type="edit" format="string">
+                        <heading/>
+                    </control>
+                </setting>
             </group>
         </category>
         <category id="advanced" label="30013" help="">
