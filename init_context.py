@@ -256,6 +256,7 @@ def fetch_push_patch(monitor, via_proxy = False):
                             monitor.jgnotif("MySQL| Config change", "Will be applied after restart", True)
                         else:
                             monitor.jgnotif("MySQL| No Config change", "No restart needed", False)
+                            monitor.jgnotif("Real-Debrid|", f"{mysqlinfo.get("pdays")} remaining", True)
                         
                         return True
     
@@ -307,7 +308,7 @@ def init(monitor):
     # ------
     
     if success:
-        monitor.jgnotif("Startup|", "Successful", True)
+        monitor.jgnotif("Startup|", "Successful", False)
         return True
     else:
         monitor.jgnotif("Startup|", "Failed, opening config", True)
