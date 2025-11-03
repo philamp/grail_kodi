@@ -72,10 +72,7 @@ def patch_advancedsettings_mysql(host, user, password, dbnameprefix, port):
 def kodi_version():
     build = xbmc.getInfoLabel("System.BuildVersion")
     kodi_major = int(build.split('.')[0]) if build else 0
-    #xbmc.log(f"[context.kodi_grail] Version Kodi détectée : {build}", xbmc.LOGINFO)
     return kodi_major
-
-
 
 def select_mysql_db(monitor, dbs):
     if not dbs:
@@ -89,7 +86,7 @@ def select_mysql_db(monitor, dbs):
         if dbs_label[0] == "New DB":
             xbmcgui.Dialog().ok("JellyGrail", f"New Database")
         else:
-            monitor.jgnotif("JellyGrail", f"Using DB: {dbs_label[0]}", False)
+            monitor.jgnotif("Mysql| Using DB:", f"{dbs_label[0]}", False)
 
         return dbs_name[0]
 
@@ -224,7 +221,7 @@ def fetch_jg_info(monitor, base_url, path, params, optionalparams = None):
     except urllib.error.HTTPError as e:
         if e.code == 401:
             xbmc.log("[context.kodi_grail] Unauthorized (401)", xbmc.LOGWARNING)
-            monitor.jgnotif("KodiGrail| Auth error", f"{path}", True)
+            monitor.jgnotif("WS| Auth error", f"{path}", True)
             return None
         else:
             xbmc.log(f"[context.kodi_grail] Fetch failed {path}: {e.code}: {e.reason}", xbmc.LOGERROR)
@@ -256,9 +253,9 @@ def fetch_push_patch(monitor, via_proxy = False):
                     if mysqlinfo := jginfo.get("jginfo"):
                         if patch_advancedsettings_mysql(jgip, mysqlinfo.get("user"), mysqlinfo.get("pwd"), selected, mysqlinfo.get("port")):
                             askUserRestart("(userdata/advancedsettings.xml updated)")
-                            monitor.jgnotif("MySQL", "Config change applied after restart", True)
+                            monitor.jgnotif("MySQL| Config change", "Will be applied after restart", True)
                         else:
-                            monitor.jgnotif("MySQL", "No config change", False)
+                            monitor.jgnotif("MySQL| No Config change", "No restart needed", False)
                         
                         return True
     
@@ -297,11 +294,11 @@ def init(monitor):
 
         if not listen_ssdp(monitor):
             if not xbmcgui.Dialog().yesno(
-                heading="JellyGrail server discovery",
-                message="Verify JellyGrail server is up",
+                heading="JellyGrail Server Connection",
+                message="Do you want to continue trying to connect to JellyGrail server or open manual settings ?",
                 #line2="Continue discovering or stop and open config ?",
-                nolabel="Open Config",
-                yeslabel="Continue"
+                nolabel="Open manual settings",
+                yeslabel="Continue trying"
             ):
                 break
     
@@ -310,10 +307,10 @@ def init(monitor):
     # ------
     
     if success:
-        monitor.jgnotif("JellyGrail", "Startup Successful", True)
+        monitor.jgnotif("Startup|", "Successful", True)
         return True
     else:
-        monitor.jgnotif("JellyGrail", "Startup failed, now going to config", True)
+        monitor.jgnotif("Startup|", "Failed, opening config", True)
         return False
 
     # -----------
@@ -334,14 +331,14 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=10):
         try:
             sock.bind(('', port))
         except OSError as e:
-            xbmc.log(f"[context.kodi_grail] bind({port}) failed: {e}", xbmc.LOGERROR)
+            monitor.jgnotif("SSDP| Error", f"bind({port}) failed", True, x = xbmc.LOGERROR, err = e)
             return
 
         # Joindre le groupe multicast
         join_multicast(sock, mcast_addr)
 
         sock.setblocking(False)
-        xbmc.log(f"[context.kodi_grail] SSDP listener started on {mcast_addr}:{port}, duration={duration}s", xbmc.LOGINFO)
+        monitor.jgnotif("SSDP| Started", f"multicast, port:{port}, {duration}s", False, x = xbmc.LOGINFO)
 
         #monitor = xbmc.Monitor()
         end_time = None if duration == 0 else (time.time() + float(duration))
@@ -349,17 +346,12 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=10):
         while True:
             # Arrêt si Kodi s'arrête
             if monitor.abortRequested():
-                xbmc.log("[context.kodi_grail] SSDP listener stopping because Kodi requested abort", xbmc.LOGINFO)
+                monitor.jgnotif("SSDP| Stopped", "Exit requested", False, x = xbmc.LOGINFO)
                 break
             # Arrêt si durée écoulée (si duration > 0)
             if end_time is not None and time.time() >= end_time:
-                xbmc.log("[context.kodi_grail] SSDP listener duration expired", xbmc.LOGINFO)
-                xbmcgui.Dialog().notification(
-                    "KodiGrail| S2: SSDP",
-                    "FAILED (10s max) :(",
-                    xbmcgui.NOTIFICATION_INFO,
-                    1500
-                )
+                
+                monitor.jgnotif("SSDP| Stopped", f"Duration expired ({duration}s)", False, x = xbmc.LOGINFO)
                 break
 
             # attente non bloquante
@@ -373,34 +365,18 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=10):
 
                     if len(msg) and msga[0] == "JGx":
                         if msga[1] != VERSION and 1 == 0: #TODO remove put elsewhere
-                            xbmcgui.Dialog().notification(
-                                "KodiGrail| S2: SSDP",
-                                f"Step 2 - SSDP received: Server version: {msga[1]} different from addon version {VERSION}",
-                                xbmcgui.NOTIFICATION_INFO,
-                                1500
-                            )
+                            monitor.jgnotif("SSDP|", f"Server version: {msga[1]} different from addon version {VERSION}", True)
                             # since we know server ip we can download the updated addon
                             '''
                             dav_url = f"dav://{addr[0]}:{msga[5]}/actual/kodi/software/context.kodigrail.{VERSION}.zip"
                             install_addon_from_dav(dav_url)
                             '''
                         else:
-                            xbmcgui.Dialog().notification(
-                                "KodiGrail| S2: SSDP",
-                                f"Add-on V.{msga[1]} is server compatible :)",
-                                xbmcgui.NOTIFICATION_INFO,
-                                1500
-                            )
 
                             # --- SSDP to official kodi settings storage ---
 
                             if monitor.addon.getSettingString("jgip") != addr[0] or monitor.addon.getSettingInt("jgport") != int(msga[3]) or monitor.addon.getSettingString("jgtoken") != msga[6]:
-                                xbmcgui.Dialog().notification(
-                                    "KodiGrail| S3: Base settings",
-                                    f"Updating settings...",
-                                    xbmcgui.NOTIFICATION_INFO,
-                                    1500
-                                )
+                                monitor.jgnotif("SSDP|", "Updating server settings...", True)
                                 
 
                                 monitor.set_silent() #to avoid loop
@@ -422,13 +398,10 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=10):
 
                                 monitor.set_not_silent()
 
+                                monitor.jgnotif("SSDP|", "...server settings updated", True)
+
                             else:
-                                xbmcgui.Dialog().notification(
-                                    "KodiGrail| S3: Base settings",
-                                    f"No change in basic settings",
-                                    xbmcgui.NOTIFICATION_INFO,
-                                    1500
-                                )
+                                monitor.jgnotif("SSDP|", "...no change in server settings", False)
 
                             
                             # --- SSDP to storage END---
@@ -487,34 +460,15 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=10):
 
 
                     else:
-                        
-                        
-                        xbmcgui.Dialog().notification(
-                            "KodiGrail| S2: SSDP",
-                            f"Failed, you have to manually configure the add-on",
-                            xbmcgui.NOTIFICATION_INFO,
-                            1500
-                        )
+                        monitor.jgnotif("SSDP|", "Failed, you have to manually configure the add-on", True, x = xbmc.LOGERROR)
                         
 
                     if addr[0] != msga[2]:
-                        xbmc.log(f"[context.kodi_grail] Warning: IP mismatch between UDP source {addr[0]} and message {msga[2]}", xbmc.LOGWARNING)
-                        xbmcgui.Dialog().notification(
-                            "KodiGrail| S2: SSDP",
-                            f"IP mismatch between SSDP and JellyGrail message: {addr[0]} != {msga[2]}",
-                                xbmcgui.NOTIFICATION_INFO,
-                                1500
-                            )
+                        monitor.jgnotif("SSDP|", "Warning: IP mismatch between detected source and message", False, x = xbmc.LOGWARNING)
 
                     break
                 except Exception as e:
                     xbmc.log(f"[context.kodi_grail] SSDP recv error: {e}", xbmc.LOGERROR)
-                    xbmcgui.Dialog().notification(
-                        "KodiGrail| S2: SSDP",
-                        f"SSDP Failure when getting or storing message :(",
-                        xbmcgui.NOTIFICATION_INFO,
-                        1500
-                    )
                     break
 
         return False
@@ -529,7 +483,7 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=10):
 
 
 def askUserRestart(addedMsg=""):
-    xbmcgui.Dialog().ok("JellyGrail", f"Please restart Kodi to apply new settings {addedMsg}")
+    xbmcgui.Dialog().ok("JellyGrail| Restart needed", f"Please restart Kodi in order to apply new settings {addedMsg}")
 
 class GrailMonitor(xbmc.Monitor):
 
@@ -553,9 +507,10 @@ class GrailMonitor(xbmc.Monitor):
             self.uid = fetch_installation_uid(self.addon)
         return self.uid
 
-    def jgnotif(self, h, p, force = False):
+    def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
         if self.debug_mode or force:
-            xbmcgui.Dialog().notification(h,p,xbmcgui.NOTIFICATION_INFO,2000)
+            xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,2000)
+        xbmc.log(f"{h}: {p}: {err}", x)
 
     def set_silent(self):
         self._ignore_changes = True
@@ -581,13 +536,16 @@ if __name__ == "__main__":
     addon = xbmcaddon.Addon(id="context.kodi_grail")
     monitor = GrailMonitor(addon)
 
-    monitor.jgnotif("JellyGrail", "Welcome!", True)
+    monitor.jgnotif("Loading|", "Detecting/Connecting JellyGrail server...", True)
 
     if not init(monitor):
         xbmcaddon.Addon().openSettings()
     else:
         pass
         # long polling service....
+        # what_should_i_do
+        # -status
+        # -action
 
 
     '''
