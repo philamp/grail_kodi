@@ -509,8 +509,9 @@ class GrailMonitor(xbmc.Monitor):
         return self.uid
 
     def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
+        latency = 500 if self.debug_mode else 1500
         if self.debug_mode or force:
-            xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,2000)
+            xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,latency)
         xbmc.log(f"{h}: {p}: {err}", x)
 
     def set_silent(self):
@@ -549,6 +550,12 @@ if __name__ == "__main__":
         # -action
 
 
+    while not monitor.abortRequested():
+        # oportunity to make periodic tasks if needed
+        if monitor.waitForAbort(5):
+            # Abort was requested while waiting. We should exit
+            break
+
     '''
     if addon.getSettingBool("override_ssdp_settings"):
         xbmcgui.Dialog().notification(
@@ -566,11 +573,7 @@ if __name__ == "__main__":
 
     # On attend la fin du service ou l'arrêt Kodi (la boucle principale reste utile si tu veux garder le service vivant)
 
-    while not monitor.abortRequested():
-        # oportunity to make periodic tasks if needed
-        if monitor.waitForAbort(5):
-            # Abort was requested while waiting. We should exit
-            break
+
 
     #while not monitor.waitForAbort(0.5):
     #    pass
