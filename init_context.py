@@ -30,6 +30,51 @@ def fetch_installation_uid(addon):
 
     return unique_id
 
+
+def patch_sources_webdav(ip, port):
+    adv_path = xbmcvfs.translatePath("special://profile/sources.xml")
+
+    xml_block = f"""<video>
+    <default pathversion="1"></default>
+    <source>
+        <name>jgMovies</name>
+        <path pathversion="1">dav://{ip}:{port}/virtual/movies/</path>
+        <allowsharing>true</allowsharing>
+    </source>
+    <source>
+        <name>jgShows</name>
+        <path pathversion="1">dav://{ip}:{port}/virtual/shows/</path>
+        <allowsharing>true</allowsharing>
+    </source>
+    </video>"""
+
+    if xbmcvfs.exists(adv_path):
+        with xbmcvfs.File(adv_path) as f:
+            content = f.read()
+        import re
+        # Supprimer toute ancienne section videodatabase
+        content_cleaned = re.sub(r"<video>.*?</video>", "", content, flags=re.DOTALL)
+        # Supprimer les retours à la ligne avant </advancedsettings>
+        content_cleaned = re.sub(r"\n*\s*</sources>", "</sources>", content_cleaned)
+        # Injecter proprement juste avant la balise fermante
+        new_content = content_cleaned.replace("</sources>", xml_block + "</sources>")
+    else:
+        content = ""
+        new_content = f"<sources>{xml_block}</sources>"
+
+
+    # Si le contenu n'a pas changé, ne rien faire
+    if new_content.strip() == content.strip():
+        xbmc.log(f"[context.kodi_grail] NO change in sources settings:", xbmc.LOGINFO)
+        return False
+
+    xbmc.log(f"[context.kodi_grail] CHANGES in sources settings:", xbmc.LOGINFO)
+    # Sinon, écrire le nouveau contenu
+    with xbmcvfs.File(adv_path, "w") as f:
+
+        f.write(new_content)
+    return True
+
 def patch_advancedsettings_mysql(host, user, password, dbnameprefix, port):
     adv_path = xbmcvfs.translatePath("special://profile/advancedsettings.xml")
 
@@ -240,9 +285,10 @@ def fetch_push_patch(monitor, via_proxy = False):
     jgip = monitor.addon.getSettingString("jgip")
     jgport = monitor.addon.getSettingInt("jgport")
     jgtoken = monitor.addon.getSettingString("jgtoken")
+    jgproxy = monitor.addon.getSettingString("jgproxy")
 
     if via_proxy:
-        base_url = "todoproxy" #TODO
+        base_url = jgproxy + "/api"
     else:
         base_url = f"http://{jgip}:{jgport}/api"
 
@@ -250,13 +296,13 @@ def fetch_push_patch(monitor, via_proxy = False):
         if dbs := jginfo.get("avail_dbs"):
             if selected := select_mysql_db(monitor, dbs):
                 if push_jg_info(monitor, base_url, "/set_db_for_this_kodi", get_base_ident_params(monitor, jgtoken), f"&choice={selected}"):
-                    if mysqlinfo := jginfo.get("jginfo"):
-                        if patch_advancedsettings_mysql(jgip, mysqlinfo.get("user"), mysqlinfo.get("pwd"), selected, mysqlinfo.get("port")):
+                    if jginfo := jginfo.get("jginfo"):
+                        if patch_advancedsettings_mysql(jgip, jginfo.get("user"), jginfo.get("pwd"), selected, jginfo.get("port")) and patch_sources_webdav(jgip, jginfo.get("davport")):
                             askUserRestart("(userdata/advancedsettings.xml updated)")
                             monitor.jgnotif("MySQL| Config change", "Will be applied after restart", True)
                         else:
                             monitor.jgnotif("MySQL| No Config change", "No restart needed", False)
-                            monitor.jgnotif("Real-Debrid|", f"{mysqlinfo.get("pdays")} remaining", True)
+                            monitor.jgnotif("Real-Debrid|", f"{jginfo.get("pdays")} remaining", True)
                         
                         return True
     
@@ -267,6 +313,7 @@ def init(monitor):
     jgip = monitor.addon.getSettingString("jgip")
     jgport = monitor.addon.getSettingInt("jgport")
     jgtoken = monitor.addon.getSettingString("jgtoken")
+    jgproxy = monitor.addon.getSettingString("jgproxy")
 
     success = False
     tries = 1
@@ -282,8 +329,9 @@ def init(monitor):
                 success = True
                 break
 
-        xbmcgui.Dialog().ok("JellyGrail", f"Accessing the server via HTTP on Local network failed, trying via proxy")
-        if 1==0 and tries == 1:  #Only once after the fail because SSDP wont need proxy
+        
+        if jgproxy != "0" and tries == 1:  #Only once after the fail because SSDP wont need proxy
+            xbmcgui.Dialog().ok("JellyGrail", f"Accessing the server via HTTP on Local network failed, trying via provided proxy")
             if fetch_push_patch(monitor, True):
                 success = True
                 break
@@ -323,7 +371,7 @@ def init(monitor):
 # ==============================
 #  Écoute SSDP (avec durée limitée)
 # ==============================
-def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=10):
+def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
     
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -391,7 +439,10 @@ def listen_ssdp(monitor, port=6505, mcast_addr="239.255.255.250", duration=10):
                                 # 2 - JGPORT
                                 if monitor.addon.getSettingInt("jgport") != int(msga[3]):
                                     monitor.addon.setSetting("jgport", msga[3])
-                                # 3 - Token
+                                # 3 - JGPROXY
+                                if monitor.addon.getSettingString("jgproxy") != msga[5]:
+                                    monitor.addon.setSetting("jgproxy", msga[5])
+                                # 4 - JGToken
                                 if monitor.addon.getSettingString("jgtoken") != msga[6]:
                                     monitor.addon.setSetting("jgtoken", msga[6])
 
