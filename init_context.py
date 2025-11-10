@@ -31,19 +31,19 @@ def fetch_installation_uid(addon):
     return unique_id
 
 
-def patch_sources_webdav(ip, port):
+def patch_sources_webdav(ipport):
     adv_path = xbmcvfs.translatePath("special://profile/sources.xml")
 
     xml_block = f"""<video>
     <default pathversion="1"></default>
     <source>
-        <name>jgMovies</name>
-        <path pathversion="1">dav://{ip}:{port}/virtual/movies/</path>
+        <name>JG-Movies</name>
+        <path pathversion="1">dav://{ipport}/virtual/movies/</path>
         <allowsharing>true</allowsharing>
     </source>
     <source>
-        <name>jgShows</name>
-        <path pathversion="1">dav://{ip}:{port}/virtual/shows/</path>
+        <name>JG-Shows</name>
+        <path pathversion="1">dav://{ipport}/virtual/shows/</path>
         <allowsharing>true</allowsharing>
     </source>
     </video>"""
@@ -292,16 +292,32 @@ def fetch_push_patch(monitor, via_proxy = False):
     else:
         base_url = f"http://{jgip}:{jgport}/api"
 
-    if jginfo := fetch_jg_info(monitor, base_url, "/get_compatible_kodiDBs", get_base_ident_params(monitor, jgtoken), None):
-        if dbs := jginfo.get("avail_dbs"):
+    askRestart = ""
+
+    if jgpayload := fetch_jg_info(monitor, base_url, "/get_compatible_kodiDBs", get_base_ident_params(monitor, jgtoken), None):
+        if dbs := jgpayload.get("avail_dbs"):
             if selected := select_mysql_db(monitor, dbs):
                 if push_jg_info(monitor, base_url, "/set_db_for_this_kodi", get_base_ident_params(monitor, jgtoken), f"&choice={selected}"):
-                    if jginfo := jginfo.get("jginfo"):
-                        if patch_advancedsettings_mysql(jgip, jginfo.get("user"), jginfo.get("pwd"), selected, jginfo.get("port")) and patch_sources_webdav(jgip, jginfo.get("davport")):
-                            askUserRestart("(userdata/advancedsettings.xml updated)")
-                            monitor.jgnotif("MySQL| Config change", "Will be applied after restart", True)
+                    if jginfo := jgpayload.get("jginfo"):
+
+
+                        if via_proxy:
+                            if "https:" in jgproxy:
+                                dav_url = f"{jgproxy.replace("https:", "davs:")}"
+                            else:
+                                dav_url = f"{jgproxy.replace("http:", "dav:")}"
                         else:
-                            monitor.jgnotif("MySQL| No Config change", "No restart needed", False)
+                            dav_url = f"{jgip}:{jginfo.get("davport")}"
+
+                        if patch_advancedsettings_mysql(jgip, jginfo.get("user"), jginfo.get("pwd"), selected, jginfo.get("port")):
+                            askRestart += "(SQL settings changed)"
+                        if patch_sources_webdav(dav_url):
+                            askRestart += "(DAV settings changed)"
+                        if askRestart != "":
+                            askUserRestart(askRestart)
+                            monitor.jgnotif("Config change", "Will be applied after restart", True)
+                        else:
+                            monitor.jgnotif("No Config change", "No restart needed", False)
                             monitor.jgnotif("Real-Debrid|", f"{jginfo.get("pdays")} remaining", True)
                         
                         return True
@@ -331,10 +347,17 @@ def init(monitor):
 
         
         if jgproxy != "0" and tries == 1:  #Only once after the fail because SSDP wont need proxy
-            xbmcgui.Dialog().ok("JellyGrail", f"Accessing the server via HTTP on Local network failed, trying via provided proxy")
-            if fetch_push_patch(monitor, True):
-                success = True
-                break
+
+            if xbmcgui.Dialog().yesno(
+                heading="JellyGrail Server Connection",
+                message="Accessing the server via HTTP on Local network failed, Do you want to try the provided proxy fallback ?",
+                nolabel="No",
+                yeslabel="Yes"
+            ):
+                if fetch_push_patch(monitor, True):
+                    success = True
+                    break
+
 
         if not config_set:
             xbmcgui.Dialog().ok("JellyGrail", f"New installation, server discovery (during 10s max)")
@@ -344,7 +367,7 @@ def init(monitor):
         if not listen_ssdp(monitor):
             if not xbmcgui.Dialog().yesno(
                 heading="JellyGrail Server Connection",
-                message="Do you want to continue trying to connect to JellyGrail server or open manual settings ?",
+                message="Do you want to continue trying to connect to JellyGrail server or open manual settings ?",
                 #line2="Continue discovering or stop and open config ?",
                 nolabel="Open manual settings",
                 yeslabel="Continue trying"
