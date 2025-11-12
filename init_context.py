@@ -16,6 +16,10 @@ import json
 
 VERSION="20250808"
 
+dbVerified = None
+
+viaProxy = False
+
 def fetch_installation_uid(addon):
     install_path = xbmcvfs.translatePath(addon.getAddonInfo("path"))
     uid_file = os.path.join(install_path, "addon_uuid.txt")
@@ -31,9 +35,10 @@ def fetch_installation_uid(addon):
     return unique_id
 
 
-def patch_sources_webdav(ipport):
+def patch_sources_webdav(ipport, roots = ["movies", "shows"]):
     adv_path = xbmcvfs.translatePath("special://profile/sources.xml")
 
+    '''
     xml_block = f"""<video>
     <default pathversion="1"></default>
     <source>
@@ -47,14 +52,27 @@ def patch_sources_webdav(ipport):
         <allowsharing>true</allowsharing>
     </source>
     </video>"""
+    '''
+    
+    xml_block = f"""<video>
+    <default pathversion="1"></default>"""
+
+    for root in roots:
+        xml_block += f"""<source>
+            <name>JG-Shows</name>
+            <path pathversion="1">dav://{ipport}/virtual/{root}/</path>
+            <allowsharing>true</allowsharing>
+        </source>"""
+
+    xml_block += f"""</video>"""
 
     if xbmcvfs.exists(adv_path):
         with xbmcvfs.File(adv_path) as f:
             content = f.read()
         import re
-        # Supprimer toute ancienne section videodatabase
+        # Supprimer toute ancienne section video
         content_cleaned = re.sub(r"<video>.*?</video>", "", content, flags=re.DOTALL)
-        # Supprimer les retours à la ligne avant </advancedsettings>
+        # Supprimer les retours à la ligne avant </sources>
         content_cleaned = re.sub(r"\n*\s*</sources>", "</sources>", content_cleaned)
         # Injecter proprement juste avant la balise fermante
         new_content = content_cleaned.replace("</sources>", xml_block + "</sources>")
@@ -131,7 +149,7 @@ def select_mysql_db(monitor, dbs):
         if dbs_label[0] == "New DB":
             xbmcgui.Dialog().ok("JellyGrail", f"New Database")
         else:
-            monitor.jgnotif("Mysql| Using DB:", f"{dbs_label[0]}", False)
+            monitor.jgnotif("Mysql| Will use DB:", f"{dbs_label[0]}", False)
 
         return dbs_name[0]
 
@@ -238,19 +256,25 @@ def join_multicast(sock, mcast_addr="239.255.255.250"):
 
 def push_jg_info(monitor, base_url, path, params, optionalparams):
 
+    global dbVerified
+
     if not optionalparams:
         return False
     
     result = fetch_jg_info(monitor, base_url, path, params, optionalparams)
 
     if result.get("status") == 200:
+        dbVerified = None
+        return True
+    
+    elif result.get("status") == 201:
         return True
     
     return False
 
 
 
-def fetch_jg_info(monitor, base_url, path, params, optionalparams = None):
+def fetch_jg_info(monitor, base_url, path, params, optionalparams = None, timeout=5):
 
     
     url = base_url + path + params
@@ -258,7 +282,7 @@ def fetch_jg_info(monitor, base_url, path, params, optionalparams = None):
 
     try:
         xbmc.log(f"[context.kodi_grail] Fetch : {url}", xbmc.LOGINFO)
-        with urllib.request.urlopen(url, timeout=5) as response:
+        with urllib.request.urlopen(url, timeout) as response:
             data = response.read().decode("utf-8")
         result = json.loads(data)
         return result
@@ -282,6 +306,9 @@ def get_base_ident_params(monitor, jgtoken):
 
 def fetch_push_patch(monitor, via_proxy = False):
 
+    global dbVerified
+    global viaProxy
+
     jgip = monitor.addon.getSettingString("jgip")
     jgport = monitor.addon.getSettingInt("jgport")
     jgtoken = monitor.addon.getSettingString("jgtoken")
@@ -289,6 +316,7 @@ def fetch_push_patch(monitor, via_proxy = False):
 
     if via_proxy:
         base_url = jgproxy + "/api"
+        viaProxy = True
     else:
         base_url = f"http://{jgip}:{jgport}/api"
 
@@ -297,6 +325,7 @@ def fetch_push_patch(monitor, via_proxy = False):
     if jgpayload := fetch_jg_info(monitor, base_url, "/get_compatible_kodiDBs", get_base_ident_params(monitor, jgtoken), None):
         if dbs := jgpayload.get("avail_dbs"):
             if selected := select_mysql_db(monitor, dbs):
+                dbVerified = selected
                 if push_jg_info(monitor, base_url, "/set_db_for_this_kodi", get_base_ident_params(monitor, jgtoken), f"&choice={selected}"):
                     if jginfo := jgpayload.get("jginfo"):
 
@@ -323,6 +352,32 @@ def fetch_push_patch(monitor, via_proxy = False):
                         return True
     
     return False
+
+def askServerLoop(monitor):
+
+    jgip = monitor.addon.getSettingString("jgip")
+    jgport = monitor.addon.getSettingInt("jgport")
+    jgtoken = monitor.addon.getSettingString("jgtoken")
+    jgproxy = monitor.addon.getSettingString("jgproxy")
+
+    if viaProxy:
+        base_url = jgproxy + "/api"
+    else:
+        base_url = f"http://{jgip}:{jgport}/api"
+
+    while not monitor.abortRequested() and dbVerified is not None:
+        result = fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=60)
+        if result.get("refresh") == True:
+
+            xbmc.executebuiltin("VideoLibrary.Scan")
+        
+        elif result.get("broken") == True:
+            break
+
+
+
+
+
 
 def init(monitor):
 
@@ -617,11 +672,17 @@ if __name__ == "__main__":
     if not init(monitor):
         xbmcaddon.Addon().openSettings()
     else:
-        pass
-        # long polling service....
-        # what_should_i_do
-        # -status
-        # -action
+        if dbVerified:
+            monitor.jgnotif("Mysql|", "DB READY", True)
+
+            askServerLoop(monitor)
+
+        else:
+            monitor.jgnotif("Mysql|", "DB PENDING RESTART", True)
+            # long polling service....
+            # what_should_i_do
+            # -status
+            # -action
 
 
     while not monitor.abortRequested():
