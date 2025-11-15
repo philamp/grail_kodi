@@ -17,8 +17,9 @@ import json
 VERSION="20250808"
 
 dbVerified = None
-
+restartAsked = False
 viaProxy = False
+anyRefreshWorking = False
 
 def fetch_installation_uid(addon):
     install_path = xbmcvfs.translatePath(addon.getAddonInfo("path"))
@@ -59,7 +60,7 @@ def patch_sources_webdav(ipport, roots = ["movies", "shows"]):
 
     for root in roots:
         xml_block += f"""<source>
-            <name>JG-Shows</name>
+            <name>JG-{root}</name>
             <path pathversion="1">dav://{ipport}/virtual/{root}/</path>
             <allowsharing>true</allowsharing>
         </source>"""
@@ -282,7 +283,7 @@ def fetch_jg_info(monitor, base_url, path, params, optionalparams = None, timeou
 
     try:
         xbmc.log(f"[context.kodi_grail] Fetch : {url}", xbmc.LOGINFO)
-        with urllib.request.urlopen(url, timeout) as response:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
             data = response.read().decode("utf-8")
         result = json.loads(data)
         return result
@@ -353,6 +354,19 @@ def fetch_push_patch(monitor, via_proxy = False):
     
     return False
 
+
+def triggerScan(monitor):
+
+    global anyRefreshWorking
+
+    if not anyRefreshWorking:
+        anyRefreshWorking = True
+        monitor.jgnotif("Scan|", "Triggered", False)
+        xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
+        
+    else:
+        monitor.jgnotif("Scan|", "ALREADY SCANNING", True) # should not happen
+
 def askServerLoop(monitor):
 
     jgip = monitor.addon.getSettingString("jgip")
@@ -366,13 +380,29 @@ def askServerLoop(monitor):
         base_url = f"http://{jgip}:{jgport}/api"
 
     while not monitor.abortRequested() and dbVerified is not None:
-        result = fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=60)
-        if result.get("refresh") == True:
+        #break #TODO temp toremove
+        xbmc.sleep(100)
+        if anyRefreshWorking == False:
+            if result := fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
+                xbmc.log("[context.kodi_grail] entered result", xbmc.LOGINFO)
 
-            xbmc.executebuiltin("VideoLibrary.Scan")
-        
-        elif result.get("broken") == True:
-            break
+                if result.get("scan") == True:
+                    xbmc.log("[context.kodi_grail] if scan true", xbmc.LOGINFO)
+
+
+                    triggerScan(monitor)
+                    #xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
+
+
+
+
+                elif result.get("broken") == True:
+                    xbmc.log("[context.kodi_grail] entered broken", xbmc.LOGINFO)
+                    break
+            else:
+                monitor.jgnotif("Error|", "Critical: server broken", True)
+                askUserRestart("Jellygrail Server broken, please restart it as well")
+                break
 
 
 
@@ -613,7 +643,9 @@ def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
 
 
 def askUserRestart(addedMsg=""):
-    xbmcgui.Dialog().ok("JellyGrail| Restart needed", f"Please restart Kodi in order to apply new settings {addedMsg}")
+    global restartAsked
+    restartAsked = True
+    xbmcgui.Dialog().ok("JellyGrail| Restart needed", f"Please restart Kodi - {addedMsg}")
 
 class GrailMonitor(xbmc.Monitor):
 
@@ -649,6 +681,23 @@ class GrailMonitor(xbmc.Monitor):
     def set_not_silent(self):
         self._ignore_changes = False
 
+    def onNotification(self, sender, method, data):
+        global anyRefreshWorking
+        if method == "VideoLibrary.OnScanStarted":
+            anyRefreshWorking = True
+            self.jgnotif("Scan|", "STARTED", True)
+            xbmc.log("[MyAddon] Scan started", xbmc.LOGINFO)
+
+        if method == "VideoLibrary.OnScanFinished":
+            anyRefreshWorking = False
+            info = json.loads(data)
+            self.jgnotif("Scan|", f"FINISHED", True)
+
+            # Trigger your asyncio/event here
+            # event.set()
+        if method == "VideoLibrary.OnUpdate":
+            self.jgnotif("Scan.NFOREFRESH", "NFOREFRESH", True)
+
     def onSettingsChanged(self):
 
         if self._ignore_changes:
@@ -672,13 +721,13 @@ if __name__ == "__main__":
     if not init(monitor):
         xbmcaddon.Addon().openSettings()
     else:
-        if dbVerified:
+        if dbVerified and not restartAsked:
             monitor.jgnotif("Mysql|", "DB READY", True)
 
             askServerLoop(monitor)
 
         else:
-            monitor.jgnotif("Mysql|", "DB PENDING RESTART", True)
+            monitor.jgnotif("Mysql|", "PENDING RESTART", True)
             # long polling service....
             # what_should_i_do
             # -status
