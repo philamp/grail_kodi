@@ -395,10 +395,13 @@ def askServerLoop(monitor):
 
 
 
-
                 elif result.get("broken") == True:
                     xbmc.log("[context.kodi_grail] entered broken", xbmc.LOGINFO)
                     break
+
+                else:
+                    monitor.jgnotif("Idle|", "No action needed", False)
+
             else:
                 monitor.jgnotif("Error|", "Critical: server broken", True)
                 askUserRestart("Jellygrail Server broken, please restart it as well")
@@ -724,6 +727,8 @@ if __name__ == "__main__":
         if dbVerified and not restartAsked:
             monitor.jgnotif("Mysql|", "DB READY", True)
 
+
+
             askServerLoop(monitor)
 
         else:
@@ -733,6 +738,8 @@ if __name__ == "__main__":
             # -status
             # -action
 
+
+        monitor.jgnotif("Debug|", "ENABLED, disable it in settings", False) # display only if debug mode
 
     while not monitor.abortRequested():
         # oportunity to make periodic tasks if needed
