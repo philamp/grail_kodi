@@ -13,6 +13,7 @@ import zipfile
 import urllib.request
 import uuid
 import json
+from threading import Event
 
 VERSION="20250808"
 
@@ -20,6 +21,7 @@ dbVerified = None
 restartAsked = False
 viaProxy = False
 anyRefreshWorking = False
+refresh_done = Event()
 
 def fetch_installation_uid(addon):
     install_path = xbmcvfs.translatePath(addon.getAddonInfo("path"))
@@ -255,6 +257,31 @@ def join_multicast(sock, mcast_addr="239.255.255.250"):
         xbmc.log(f"[context.kodi_grail] multicast join failed: {e}", xbmc.LOGERROR)
 
 
+def get_base_or_dav_url(monitor, davPort=None):
+
+    jgip = monitor.addon.getSettingString("jgip")
+    jgport = monitor.addon.getSettingInt("jgport")
+    jgproxy = monitor.addon.getSettingString("jgproxy")
+
+    if not davPort:
+        if viaProxy:
+            base_url = jgproxy + "/api"
+        else:
+            base_url = f"http://{jgip}:{jgport}/api"
+
+        return base_url
+    
+    # else
+    if viaProxy:
+        if "https:" in jgproxy:
+            dav_url = f"{jgproxy.replace("https:", "davs:")}"
+        else:
+            dav_url = f"{jgproxy.replace("http:", "dav:")}"
+    else:
+        dav_url = f"{jgip}:{davPort}"
+
+    return dav_url
+
 def push_jg_info(monitor, base_url, path, params, optionalparams):
 
     global dbVerified
@@ -311,15 +338,13 @@ def fetch_push_patch(monitor, via_proxy = False):
     global viaProxy
 
     jgip = monitor.addon.getSettingString("jgip")
-    jgport = monitor.addon.getSettingInt("jgport")
     jgtoken = monitor.addon.getSettingString("jgtoken")
-    jgproxy = monitor.addon.getSettingString("jgproxy")
 
     if via_proxy:
-        base_url = jgproxy + "/api"
         viaProxy = True
-    else:
-        base_url = f"http://{jgip}:{jgport}/api"
+
+    base_url = get_base_or_dav_url(monitor)
+
 
     askRestart = ""
 
@@ -330,14 +355,7 @@ def fetch_push_patch(monitor, via_proxy = False):
                 if push_jg_info(monitor, base_url, "/set_db_for_this_kodi", get_base_ident_params(monitor, jgtoken), f"&choice={selected}"):
                     if jginfo := jgpayload.get("jginfo"):
 
-
-                        if via_proxy:
-                            if "https:" in jgproxy:
-                                dav_url = f"{jgproxy.replace("https:", "davs:")}"
-                            else:
-                                dav_url = f"{jgproxy.replace("http:", "dav:")}"
-                        else:
-                            dav_url = f"{jgip}:{jginfo.get("davport")}"
+                        dav_url = get_base_or_dav_url(monitor, jginfo.get("davport"))
 
                         if patch_advancedsettings_mysql(jgip, jginfo.get("user"), jginfo.get("pwd"), selected, jginfo.get("port")):
                             askRestart += "(SQL settings changed)"
@@ -355,6 +373,84 @@ def fetch_push_patch(monitor, via_proxy = False):
     return False
 
 
+def get_typeid_with_reftype(refType):
+
+    if refType == "Movie":
+        return "movieid"
+    elif refType == "TVShow":
+        return "tvshowid"
+    elif refType == "Episode":
+        return "episodeid"
+    else:
+        return "movieid"
+
+def triggerNfoRefresh(monitor):
+    global anyRefreshWorking
+    if not anyRefreshWorking:
+        anyRefreshWorking = True
+
+        base_url = get_base_or_dav_url(monitor)
+        jgtoken = monitor.addon.getSettingString("jgtoken")
+
+        # structure of result is :
+        '''
+        {
+            "payload": {
+                "243": {
+                "Movie": [45, 58, 62],
+                "TVShow": [12, 14],
+                "Episode": [101, 102, 103]
+                }
+            }
+            "status": 201
+        }
+        '''
+
+        if result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=60):
+            if result.get("status") != 201:
+                monitor.jgnotif("NFOREFRESH|", "No NFO to refresh", False)
+                return
+
+            for key, val in result.get("payload").items():
+                for refType, ids in val.items():
+                    typeid = get_typeid_with_reftype(refType)
+                    for id in ids:
+                        
+
+                        payload = {
+                            "jsonrpc": "2.0",
+                            "id": "1",
+                            "method": f"VideoLibrary.Refresh{refType}",
+                            "params": {
+                                typeid: id
+                            }
+                        }
+
+                        xbmc.executeJSONRPC(json.dumps(payload))
+
+                        #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
+                        xbmc.sleep(10)
+                        refresh_done.wait(timeout=60)
+                        xbmc.sleep(10)
+                        refresh_done.clear()
+                        xbmc.sleep(10)
+                        monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", True)
+                        
+
+                # set this key is consumed:
+                # call /set_consumed endpoint with batchid param:
+                fetch_jg_info(monitor, base_url, "/set_consumed", get_base_ident_params(monitor, jgtoken), f"&batchid={key}", timeout=10)
+
+                
+
+
+
+
+        # thanks to refresh_done event, use jssonrpc to trigger nforefresh per and wait for completion
+
+        anyRefreshWorking = False
+        monitor.jgnotif("NFOREFRESH|", "Finished", False)
+
 def triggerScan(monitor):
 
     global anyRefreshWorking
@@ -369,31 +465,27 @@ def triggerScan(monitor):
 
 def askServerLoop(monitor):
 
-    jgip = monitor.addon.getSettingString("jgip")
-    jgport = monitor.addon.getSettingInt("jgport")
     jgtoken = monitor.addon.getSettingString("jgtoken")
-    jgproxy = monitor.addon.getSettingString("jgproxy")
 
-    if viaProxy:
-        base_url = jgproxy + "/api"
-    else:
-        base_url = f"http://{jgip}:{jgport}/api"
+    base_url = get_base_or_dav_url(monitor)
 
     while not monitor.abortRequested() and dbVerified is not None:
         #break #TODO temp toremove
-        xbmc.sleep(100)
-        if anyRefreshWorking == False:
+        xbmc.sleep(10)
+        if not anyRefreshWorking:
             if result := fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
                 xbmc.log("[context.kodi_grail] entered result", xbmc.LOGINFO)
 
                 if result.get("scan") == True:
                     xbmc.log("[context.kodi_grail] if scan true", xbmc.LOGINFO)
-
-
                     triggerScan(monitor)
                     #xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
 
-
+                elif result.get("nforefresh") == True:
+                    xbmc.log("[context.kodi_grail] if nforefresh true", xbmc.LOGINFO)
+                    #triggerNfoRefresh(monitor)
+                    thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor}, daemon=True)
+                    thread.start()
 
                 elif result.get("broken") == True:
                     xbmc.log("[context.kodi_grail] entered broken", xbmc.LOGINFO)
@@ -429,7 +521,7 @@ def init(monitor):
     while not success:
 
         if config_set or tries > 1:
-            if fetch_push_patch(monitor, False):
+            if fetch_push_patch(monitor, False): # noproxy
                 success = True
                 break
 
@@ -442,7 +534,7 @@ def init(monitor):
                 nolabel="No",
                 yeslabel="Yes"
             ):
-                if fetch_push_patch(monitor, True):
+                if fetch_push_patch(monitor, True): # via proxy
                     success = True
                     break
 
@@ -686,6 +778,7 @@ class GrailMonitor(xbmc.Monitor):
 
     def onNotification(self, sender, method, data):
         global anyRefreshWorking
+        global refresh_done
         if method == "VideoLibrary.OnScanStarted":
             anyRefreshWorking = True
             self.jgnotif("Scan|", "STARTED", True)
@@ -699,7 +792,11 @@ class GrailMonitor(xbmc.Monitor):
             # Trigger your asyncio/event here
             # event.set()
         if method == "VideoLibrary.OnUpdate":
-            self.jgnotif("Scan.NFOREFRESH", "NFOREFRESH", True)
+            #self.jgnotif("Scan.NFOREFRESH", "NFOREFRESH", True)
+            xbmc.log("[MyAddon] NFO updated", xbmc.LOGINFO)
+            xbmc.sleep(10)
+            refresh_done.set()
+            xbmc.sleep(10)
 
     def onSettingsChanged(self):
 
