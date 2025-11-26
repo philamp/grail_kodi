@@ -406,57 +406,53 @@ def triggerNfoRefresh(monitor):
         }
         '''
 
-        if result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=60):
-            if result.get("status") != 201:
-                monitor.jgnotif("NFOREFRESH|", "No NFO to refresh", False)
-                return
+        if not (result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=60)):
+            monitor.jgnotif("NFOREFRESH|", "Triggered on server but no NFOs", False)
+            return
+        
 
-            for key, val in result.get("payload").items():
-                for refType, ids in val.items():
-                    typeid = get_typeid_with_reftype(refType)
-                    for id in ids:
-                        
+        # else
+        for key, val in result.get("payload").items():
+            for refType, ids in val.items():
+                typeid = get_typeid_with_reftype(refType)
+                for id in ids:
+                    
 
-                        payload = {
-                            "jsonrpc": "2.0",
-                            "id": "1",
-                            "method": f"VideoLibrary.Refresh{refType}",
-                            "params": {
-                                typeid: id
-                            }
+                    payload = {
+                        "jsonrpc": "2.0",
+                        "id": "1",
+                        "method": f"VideoLibrary.Refresh{refType}",
+                        "params": {
+                            typeid: id
                         }
+                    }
 
-                        xbmc.executeJSONRPC(json.dumps(payload))
+                    xbmc.executeJSONRPC(json.dumps(payload))
 
-                        #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
-                        xbmc.sleep(10)
-                        refresh_done.wait(timeout=60)
-                        xbmc.sleep(10)
-                        refresh_done.clear()
-                        xbmc.sleep(10)
-                        monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", True)
-                        
+                    #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
+                    xbmc.sleep(1)
+                    refresh_done.wait(timeout=60)
+                    xbmc.sleep(1)
+                    refresh_done.clear()
+                    xbmc.sleep(1)
+                    monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", True)
+                    
 
-                # set this key is consumed:
-                # call /set_consumed endpoint with batchid param:
-                fetch_jg_info(monitor, base_url, "/set_consumed", get_base_ident_params(monitor, jgtoken), f"&batchid={key}", timeout=10)
-
-                
-
-
-
+            # set this key is consumed:
+            # call /set_consumed endpoint with batchid param:
+            fetch_jg_info(monitor, base_url, "/set_consumed", get_base_ident_params(monitor, jgtoken), f"&batchid={key}", timeout=10)
 
         # thanks to refresh_done event, use jssonrpc to trigger nforefresh per and wait for completion
 
         anyRefreshWorking = False
-        monitor.jgnotif("NFOREFRESH|", "Finished", False)
+        monitor.jgnotif("NFOREFRESH|", "Batch Finished", False)
 
 def triggerScan(monitor):
 
     global anyRefreshWorking
 
     if not anyRefreshWorking:
-        anyRefreshWorking = True
+        anyRefreshWorking = True # set it here in addition to event listener in monitor
         monitor.jgnotif("Scan|", "Triggered", False)
         xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
         
@@ -471,8 +467,8 @@ def askServerLoop(monitor):
 
     while not monitor.abortRequested() and dbVerified is not None:
         #break #TODO temp toremove
-        xbmc.sleep(10)
-        if not anyRefreshWorking:
+        xbmc.sleep(100) #wait 0.1s between loops
+        if not anyRefreshWorking: 
             if result := fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
                 xbmc.log("[context.kodi_grail] entered result", xbmc.LOGINFO)
 
@@ -492,7 +488,8 @@ def askServerLoop(monitor):
                     break
 
                 else:
-                    monitor.jgnotif("Idle|", "No action needed", False)
+                    #monitor.jgnotif("Idle|", "No action needed", False)
+                    pass
 
             else:
                 monitor.jgnotif("Error|", "Critical: server broken", True)
@@ -793,10 +790,10 @@ class GrailMonitor(xbmc.Monitor):
             # event.set()
         if method == "VideoLibrary.OnUpdate":
             #self.jgnotif("Scan.NFOREFRESH", "NFOREFRESH", True)
-            xbmc.log("[MyAddon] NFO updated", xbmc.LOGINFO)
-            xbmc.sleep(10)
+            #xbmc.log("[MyAddon] NFO updated", xbmc.LOGINFO)
+            xbmc.sleep(1)
             refresh_done.set()
-            xbmc.sleep(10)
+            xbmc.sleep(1)
 
     def onSettingsChanged(self):
 
@@ -825,7 +822,7 @@ if __name__ == "__main__":
             monitor.jgnotif("Mysql|", "DB READY", True)
 
 
-
+            monitor.jgnotif("Debug|", "ENABLED, disable it in settings", False)
             askServerLoop(monitor)
 
         else:
@@ -836,7 +833,7 @@ if __name__ == "__main__":
             # -action
 
 
-        monitor.jgnotif("Debug|", "ENABLED, disable it in settings", False) # display only if debug mode
+         # display only if debug mode
 
     while not monitor.abortRequested():
         # oportunity to make periodic tasks if needed
