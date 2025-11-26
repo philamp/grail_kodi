@@ -274,9 +274,9 @@ def get_base_or_dav_url(monitor, davPort=None):
     # else
     if viaProxy:
         if "https:" in jgproxy:
-            dav_url = f"{jgproxy.replace("https:", "davs:")}"
+            dav_url = f"{jgproxy.replace('https:', 'davs:')}"
         else:
-            dav_url = f"{jgproxy.replace("http:", "dav:")}"
+            dav_url = f"{jgproxy.replace('http:', 'dav:')}"
     else:
         dav_url = f"{jgip}:{davPort}"
 
@@ -366,7 +366,7 @@ def fetch_push_patch(monitor, via_proxy = False):
                             monitor.jgnotif("Config change", "Will be applied after restart", True)
                         else:
                             monitor.jgnotif("No Config change", "No restart needed", False)
-                            monitor.jgnotif("Real-Debrid|", f"{jginfo.get("pdays")} remaining", True)
+                            monitor.jgnotif("Real-Debrid|", f"{jginfo.get('pdays')} remaining", True)
                         
                         return True
     
