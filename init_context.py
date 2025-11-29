@@ -460,6 +460,16 @@ def triggerScan(monitor):
     else:
         monitor.jgnotif("Scan|", "ALREADY SCANNING", True) # should not happen
 
+def uiRefresh():
+
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "VideoLibrary.Scan",
+        "params": {"directory": "dummy/path/just/to/refresh"},
+        "id": "1"
+    }
+    xbmc.executeJSONRPC(json.dumps(payload))
+
 def callSpecialOps(monitor):
 
     base_url = get_base_or_dav_url(monitor)
@@ -468,6 +478,7 @@ def callSpecialOps(monitor):
     if result := fetch_jg_info(monitor, base_url, "/special_ops", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
         if result.get("status") == 201:
             monitor.jgnotif("SpecialOps|", "Completed", False)
+            uiRefresh()
         else:
             monitor.jgnotif("SpecialOps|", "No ops to do", False)
     else:
