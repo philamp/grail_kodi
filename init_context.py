@@ -490,7 +490,6 @@ def askServerLoop(monitor):
                     xbmc.log("[context.kodi_grail] if scan true", xbmc.LOGINFO)
                     triggerScan(monitor)
                     #xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
-                    callSpecialOps(monitor)
 
                 elif result.get("nforefresh") == True:
                     xbmc.log("[context.kodi_grail] if nforefresh true", xbmc.LOGINFO)
@@ -777,7 +776,7 @@ class GrailMonitor(xbmc.Monitor):
         return self.uid
 
     def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
-        latency = 500 if self.debug_mode else 1500
+        latency = 300 if self.debug_mode else 300
         if self.debug_mode or force:
             xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,latency)
         xbmc.log(f"{h}: {p}: {err}", x)
