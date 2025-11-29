@@ -446,6 +446,7 @@ def triggerNfoRefresh(monitor):
 
         anyRefreshWorking = False
         monitor.jgnotif("NFOREFRESH|", "Batch Finished", False)
+        callSpecialOps(monitor)
 
 def triggerScan(monitor):
 
@@ -458,6 +459,19 @@ def triggerScan(monitor):
         
     else:
         monitor.jgnotif("Scan|", "ALREADY SCANNING", True) # should not happen
+
+def callSpecialOps(monitor):
+
+    base_url = get_base_or_dav_url(monitor)
+    jgtoken = monitor.addon.getSettingString("jgtoken")
+
+    if result := fetch_jg_info(monitor, base_url, "/special_ops", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
+        if result.get("status") == 201:
+            monitor.jgnotif("SpecialOps|", "Completed", False)
+        else:
+            monitor.jgnotif("SpecialOps|", "No ops to do", False)
+    else:
+        monitor.jgnotif("SpecialOps|", "Error contacting server", True)
 
 def askServerLoop(monitor):
 
@@ -476,6 +490,7 @@ def askServerLoop(monitor):
                     xbmc.log("[context.kodi_grail] if scan true", xbmc.LOGINFO)
                     triggerScan(monitor)
                     #xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
+                    callSpecialOps(monitor)
 
                 elif result.get("nforefresh") == True:
                     xbmc.log("[context.kodi_grail] if nforefresh true", xbmc.LOGINFO)
@@ -785,6 +800,7 @@ class GrailMonitor(xbmc.Monitor):
             anyRefreshWorking = False
             info = json.loads(data)
             self.jgnotif("Scan|", f"FINISHED", True)
+            callSpecialOps(self)
 
             # Trigger your asyncio/event here
             # event.set()
@@ -822,7 +838,7 @@ if __name__ == "__main__":
             monitor.jgnotif("Mysql|", "DB READY", True)
 
 
-            monitor.jgnotif("Debug|", "ENABLED, disable it in settings", False)
+            monitor.jgnotif("Too many notifs?", "disable debug in addon settings", False)
             askServerLoop(monitor)
 
         else:
