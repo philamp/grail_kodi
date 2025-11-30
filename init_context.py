@@ -15,6 +15,26 @@ import uuid
 import json
 from threading import Event
 
+'''
+DB_HOST = "172.22.2.222"
+DB_PORT = 3306
+TIMEOUT = 3
+
+def mysql_reachable():
+    try:
+        with socket.create_connection((DB_HOST, DB_PORT), TIMEOUT):
+            return True
+    except OSError:
+        return False
+
+if not mysql_reachable():
+    # Big warning
+    xbmc.executebuiltin(
+        'Notification(MySQL Error,Database at {0} unreachable,8000)'.format(DB_HOST)
+    )
+    xbmc.sleep(8000)
+    xbmc.executebuiltin("Quit")
+'''
 VERSION="20250808"
 
 dbVerified = None

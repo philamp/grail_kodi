@@ -25,12 +25,16 @@ def run():
 
         xbmc.log(f"{LOG} called: action={action}, path={media_path}", xbmc.LOGINFO)
 
+        #dialog = xbmcgui.Dialog()
+        #retr = dialog.contextmenu(['Option #1', 'Option #2', 'Option #3'])
+
         title = xbmc.getInfoLabel("ListItem.Title") or "Inconnu"
         dbid = xbmc.getInfoLabel("ListItem.DBID") or "N/A"
         dbtype = xbmc.getInfoLabel("ListItem.DBTYPE") or "?"
 
         message = (
             f"Action : {action}\n\n"
+            f"clicked: dfdsf\n\n"
             f"ID : {dbid}\n"
             f"Titre : {title}\n"
             f"Type : {dbtype}\n"
