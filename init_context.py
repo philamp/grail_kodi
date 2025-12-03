@@ -1,8 +1,6 @@
-import xbmc
-import xbmcgui
-import xbmcvfs
-import xbmcaddon
-import os
+from resources.lib.common import *
+
+
 #import shutil
 import socket
 import struct
@@ -14,6 +12,7 @@ import urllib.request
 import uuid
 import json
 from threading import Event
+
 
 '''
 DB_HOST = "172.22.2.222"
@@ -35,7 +34,6 @@ if not mysql_reachable():
     xbmc.sleep(8000)
     xbmc.executebuiltin("Quit")
 '''
-VERSION="20250808"
 
 dbVerified = None
 restartAsked = False
@@ -430,7 +428,7 @@ def triggerNfoRefresh(monitor):
             monitor.jgnotif("NFOREFRESH|", "Triggered on server but no NFOs", False)
             return
         
-
+        monitor.jgnotif("NFOREFRESH|", "(screen may flicker)", True)
         # else
         for key, val in result.get("payload").items():
             for refType, ids in val.items():
@@ -451,11 +449,11 @@ def triggerNfoRefresh(monitor):
 
                     #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
                     xbmc.sleep(1)
-                    refresh_done.wait(timeout=60)
+                    refresh_done.wait(timeout=6)
                     xbmc.sleep(1)
                     refresh_done.clear()
                     xbmc.sleep(1)
-                    monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", True)
+                    #monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", False)
                     
 
             # set this key is consumed:
@@ -465,7 +463,7 @@ def triggerNfoRefresh(monitor):
         # thanks to refresh_done event, use jssonrpc to trigger nforefresh per and wait for completion
 
         anyRefreshWorking = False
-        monitor.jgnotif("NFOREFRESH|", "Batch Finished", False)
+        monitor.jgnotif("NFOREFRESH|", "Completed", True)
         callSpecialOps(monitor)
 
 def triggerScan(monitor):
@@ -777,7 +775,6 @@ def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
         except Exception:
             pass
         xbmc.log("[context.kodi_grail] SSDP listener stopped", xbmc.LOGINFO)
-
 
 def askUserRestart(addedMsg=""):
     global restartAsked
