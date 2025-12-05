@@ -8,7 +8,6 @@ import select
 import threading
 import time
 import zipfile
-import urllib.request
 import uuid
 import json
 from threading import Event
@@ -104,10 +103,10 @@ def patch_sources_webdav(ipport, roots = ["movies", "shows"]):
 
     # Si le contenu n'a pas changé, ne rien faire
     if new_content.strip() == content.strip():
-        xbmc.log(f"[context.kodi_grail] NO change in sources settings:", xbmc.LOGINFO)
+        xbmc.log(f"JellyGrail| NO change in sources settings:", xbmc.LOGINFO)
         return False
 
-    xbmc.log(f"[context.kodi_grail] CHANGES in sources settings:", xbmc.LOGINFO)
+    xbmc.log(f"JellyGrail| CHANGES in sources settings:", xbmc.LOGINFO)
     # Sinon, écrire le nouveau contenu
     with xbmcvfs.File(adv_path, "w") as f:
 
@@ -143,20 +142,15 @@ def patch_advancedsettings_mysql(host, user, password, dbnameprefix, port):
 
     # Si le contenu n'a pas changé, ne rien faire
     if new_content.strip() == content.strip():
-        xbmc.log(f"[context.kodi_grail] NO change in adv settings:", xbmc.LOGINFO)
+        xbmc.log(f"JellyGrail| NO change in adv settings:", xbmc.LOGINFO)
         return False
 
-    xbmc.log(f"[context.kodi_grail] CHANGES in adv settings:", xbmc.LOGINFO)
+    xbmc.log(f"JellyGrail| CHANGES in adv settings:", xbmc.LOGINFO)
     # Sinon, écrire le nouveau contenu
     with xbmcvfs.File(adv_path, "w") as f:
 
         f.write(new_content)
     return True
-
-def kodi_version():
-    build = xbmc.getInfoLabel("System.BuildVersion")
-    kodi_major = int(build.split('.')[0]) if build else 0
-    return kodi_major
 
 def select_mysql_db(monitor, dbs):
     if not dbs:
@@ -182,7 +176,7 @@ def select_mysql_db(monitor, dbs):
 
 def install_addon_from_local_zip(zip_path):
     addons_dir = xbmcvfs.translatePath("special://home/addons/")
-    xbmc.log(f"[context.kodi_grail] Installation manuelle depuis {zip_path}", xbmc.LOGINFO)
+    xbmc.log(f"JellyGrail| Installation manuelle depuis {zip_path}", xbmc.LOGINFO)
 
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -191,12 +185,12 @@ def install_addon_from_local_zip(zip_path):
 
             # Supprimer ancienne version
             if xbmcvfs.exists(dest_path):
-                xbmc.log(f"[context.kodi_grail] Suppression de l'ancienne version : {dest_path}", xbmc.LOGINFO)
+                xbmc.log(f"JellyGrail| Suppression de l'ancienne version : {dest_path}", xbmc.LOGINFO)
                 xbmcvfs.rmdir(dest_path, force=True)
 
             # Extraction
             zip_ref.extractall(addons_dir)
-            xbmc.log(f"[context.kodi_grail] Extraction réussie vers {addons_dir}", xbmc.LOGINFO)
+            xbmc.log(f"JellyGrail| Extraction réussie vers {addons_dir}", xbmc.LOGINFO)
 
         # Forcer un reload des addons
         xbmc.executebuiltin("UpdateLocalAddons")
@@ -204,7 +198,7 @@ def install_addon_from_local_zip(zip_path):
 
         xbmcgui.Dialog().notification("JellyGrail", f"Addon installé : {root_name}", time=4000)
     except Exception as e:
-        xbmc.log(f"[context.kodi_grail] Manual install error : {e}", xbmc.LOGERROR)
+        xbmc.log(f"JellyGrail| Manual install error : {e}", xbmc.LOGERROR)
 
 def install_addon_from_dav(dav_url):
     try:
@@ -212,20 +206,20 @@ def install_addon_from_dav(dav_url):
         zip_name = dav_url.split('/')[-1]
         local_path = temp_path + zip_name
 
-        xbmc.log(f"[context.kodi_grail] Téléchargement depuis {dav_url} vers {local_path}", xbmc.LOGINFO)
+        xbmc.log(f"JellyGrail| Téléchargement depuis {dav_url} vers {local_path}", xbmc.LOGINFO)
 
         if xbmcvfs.copy(dav_url, local_path):
-            xbmc.log(f"[context.kodi_grail] Copie réussie: {local_path}", xbmc.LOGINFO)
+            xbmc.log(f"JellyGrail| Copie réussie: {local_path}", xbmc.LOGINFO)
             install_addon_from_local_zip(local_path)
             # xbmc.executebuiltin(f'InstallAddonFromZip("{local_path}")')
 
             xbmcgui.Dialog().ok("JellyGrail", "Restart Kodi to complete JellyGrail addon installation")
 
         else:
-            xbmc.log(f"[context.kodi_grail] Copy failed from {dav_url}", xbmc.LOGERROR)
+            xbmc.log(f"JellyGrail| Copy failed from {dav_url}", xbmc.LOGERROR)
 
     except Exception as e:
-        xbmc.log(f"[context.kodi_grail] Installation Errot: {e}", xbmc.LOGERROR)
+        xbmc.log(f"JellyGrail| Installation Errot: {e}", xbmc.LOGERROR)
 
 
 
@@ -237,9 +231,9 @@ def preload_context():
     """Précharge le module contextuel pour initialiser Kodi (évite le crash SIGSEGV)."""
     try:
         import resources.lib.contextitem as contextitem
-        xbmc.log("[context.kodi_grail] contextitem preloaded successfully", xbmc.LOGINFO)
+        xbmc.log("JellyGrail| contextitem preloaded successfully", xbmc.LOGINFO)
     except Exception as e:
-        xbmc.log(f"[context.kodi_grail] preload failed: {e}", xbmc.LOGERROR)
+        xbmc.log(f"JellyGrail| preload failed: {e}", xbmc.LOGERROR)
 
 
 def guess_ip():
@@ -270,9 +264,9 @@ def join_multicast(sock, mcast_addr="239.255.255.250"):
                            socket.inet_aton(mcast_addr),
                            socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-        xbmc.log(f"[context.kodi_grail] joined multicast group {mcast_addr} on {iface_ip}", xbmc.LOGINFO)
+        xbmc.log(f"JellyGrail| joined multicast group {mcast_addr} on {iface_ip}", xbmc.LOGINFO)
     except Exception as e:
-        xbmc.log(f"[context.kodi_grail] multicast join failed: {e}", xbmc.LOGERROR)
+        xbmc.log(f"JellyGrail| multicast join failed: {e}", xbmc.LOGERROR)
 
 
 def get_base_or_dav_url(monitor, davPort=None):
@@ -300,6 +294,10 @@ def get_base_or_dav_url(monitor, davPort=None):
 
     return dav_url
 
+def get_base_ident_params(monitor, jgtoken):
+
+    return f"?token={jgtoken}&kodi_version={kodi_version()}&uid={monitor.get_uid()}&ip={monitor.get_ip()}"
+
 def push_jg_info(monitor, base_url, path, params, optionalparams):
 
     global dbVerified
@@ -317,38 +315,6 @@ def push_jg_info(monitor, base_url, path, params, optionalparams):
         return True
     
     return False
-
-
-
-def fetch_jg_info(monitor, base_url, path, params, optionalparams = None, timeout=5):
-
-    
-    url = base_url + path + params
-    url += optionalparams if optionalparams is not None else ""
-
-    try:
-        xbmc.log(f"[context.kodi_grail] Fetch : {url}", xbmc.LOGINFO)
-        with urllib.request.urlopen(url, timeout=timeout) as response:
-            data = response.read().decode("utf-8")
-        result = json.loads(data)
-        return result
-
-    except urllib.error.HTTPError as e:
-        if e.code == 401:
-            xbmc.log("[context.kodi_grail] Unauthorized (401)", xbmc.LOGWARNING)
-            monitor.jgnotif("WS| Auth error", f"{path}", True)
-            return None
-        else:
-            xbmc.log(f"[context.kodi_grail] Fetch failed {path}: {e.code}: {e.reason}", xbmc.LOGERROR)
-            return None
-        
-    except Exception as e:
-        xbmc.log(f"[context.kodi_grail] Fetch failed {path}: {e}", xbmc.LOGERROR)
-        return None
-
-def get_base_ident_params(monitor, jgtoken):
-
-    return f"?token={jgtoken}&kodi_version={kodi_version()}&uid={monitor.get_uid()}&ip={monitor.get_ip()}"
 
 def fetch_push_patch(monitor, via_proxy = False):
 
@@ -426,6 +392,7 @@ def triggerNfoRefresh(monitor):
 
         if not (result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=60)):
             monitor.jgnotif("NFOREFRESH|", "Triggered on server but no NFOs", False)
+            anyRefreshWorking = False
             return
         
         monitor.jgnotif("NFOREFRESH|", "(screen may flicker)", True)
@@ -445,14 +412,14 @@ def triggerNfoRefresh(monitor):
                         }
                     }
 
+
                     xbmc.executeJSONRPC(json.dumps(payload))
 
                     #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
-                    xbmc.sleep(1)
+                    xbmc.sleep(10)
                     refresh_done.wait(timeout=6)
-                    xbmc.sleep(1)
                     refresh_done.clear()
-                    xbmc.sleep(1)
+                    xbmc.sleep(10)
                     #monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", False)
                     
 
@@ -478,7 +445,7 @@ def triggerScan(monitor):
     else:
         monitor.jgnotif("Scan|", "ALREADY SCANNING", True) # should not happen
 
-def uiRefresh():
+def uiRefresh(monitor):
 
     payload = {
         "jsonrpc": "2.0",
@@ -486,7 +453,13 @@ def uiRefresh():
         "params": {"directory": "dummy/path/just/to/refresh"},
         "id": "1"
     }
+
+    #ui refresh should not set refreshworking to false nor call again specialops in loop
+    monitor.disallowRealOnScan()
+    xbmc.sleep(100)
     xbmc.executeJSONRPC(json.dumps(payload))
+    xbmc.sleep(100)
+    monitor.allowRealOnScan()
 
 def callSpecialOps(monitor):
 
@@ -496,7 +469,7 @@ def callSpecialOps(monitor):
     if result := fetch_jg_info(monitor, base_url, "/special_ops", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
         if result.get("status") == 201:
             monitor.jgnotif("SpecialOps|", "Completed", False)
-            uiRefresh()
+            uiRefresh(monitor)
         else:
             monitor.jgnotif("SpecialOps|", "No ops to do", False)
     else:
@@ -513,21 +486,21 @@ def askServerLoop(monitor):
         xbmc.sleep(100) #wait 0.1s between loops
         if not anyRefreshWorking: 
             if result := fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
-                xbmc.log("[context.kodi_grail] entered result", xbmc.LOGINFO)
+                xbmc.log("JellyGrail| entered result", xbmc.LOGINFO)
 
                 if result.get("scan") == True:
-                    xbmc.log("[context.kodi_grail] if scan true", xbmc.LOGINFO)
+                    xbmc.log("JellyGrail| if scan true", xbmc.LOGINFO)
                     triggerScan(monitor)
                     #xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
 
                 elif result.get("nforefresh") == True:
-                    xbmc.log("[context.kodi_grail] if nforefresh true", xbmc.LOGINFO)
+                    xbmc.log("JellyGrail| if nforefresh true", xbmc.LOGINFO)
                     #triggerNfoRefresh(monitor)
                     thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor}, daemon=True)
                     thread.start()
 
                 elif result.get("broken") == True:
-                    xbmc.log("[context.kodi_grail] entered broken", xbmc.LOGINFO)
+                    xbmc.log("JellyGrail| entered broken", xbmc.LOGINFO)
                     break
 
                 else:
@@ -652,7 +625,7 @@ def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
                 try:
                     data, addr = sock.recvfrom(65535)
                     msg = data.decode(errors="ignore").strip()
-                    xbmc.log(f"[context.kodi_grail] SSDP from {addr}: {msg}", xbmc.LOGINFO)
+                    xbmc.log(f"JellyGrail| SSDP from {addr}: {msg}", xbmc.LOGINFO)
                     msga = msg.split("|")
 
                     if len(msg) and msga[0] == "JGx":
@@ -719,7 +692,7 @@ def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
                             local_ip = guess_ip()
 
                             # we have the port for SQL in SSDP -> advsettings
-                            xbmc.log(f"[context.kodi_grail] UUID:{uuid}, SSDP_TOKEN: {ssdp_token}, kodiverison: {kodiverison}", xbmc.LOGINFO)
+                            xbmc.log(f"JellyGrail| UUID:{uuid}, SSDP_TOKEN: {ssdp_token}, kodiverison: {kodiverison}", xbmc.LOGINFO)
 
                             BASE_URL = f"http://{addr[0]}:{msga[3]}/api"
 
@@ -738,7 +711,7 @@ def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
                                 selected = select_mysql_db(dbs)
                             if selected:
                                 send_choice_to_server(f"{BASE_URL}/set_db_for_this_kodi{BASE_IDENT}&choice={selected}")
-                                xbmc.log(f"[context.kodi_grail] Selected DB : {selected}", xbmc.LOGINFO)
+                                xbmc.log(f"JellyGrail| Selected DB : {selected}", xbmc.LOGINFO)
                         
                             
 
@@ -763,18 +736,18 @@ def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
 
                     break
                 except Exception as e:
-                    xbmc.log(f"[context.kodi_grail] SSDP recv error: {e}", xbmc.LOGERROR)
+                    xbmc.log(f"JellyGrail| SSDP recv error: {e}", xbmc.LOGERROR)
                     break
 
         return False
     except Exception as e:
-        xbmc.log(f"[context.kodi_grail] SSDP listener setup failed: {e}", xbmc.LOGERROR)
+        xbmc.log(f"JellyGrail| SSDP listener setup failed: {e}", xbmc.LOGERROR)
     finally:
         try:
             sock.close()
         except Exception:
             pass
-        xbmc.log("[context.kodi_grail] SSDP listener stopped", xbmc.LOGINFO)
+        xbmc.log("JellyGrail| SSDP listener stopped", xbmc.LOGINFO)
 
 def askUserRestart(addedMsg=""):
     global restartAsked
@@ -792,6 +765,7 @@ class GrailMonitor(xbmc.Monitor):
         self.uid = None
         self._ignore_changes = False
         self.debug_mode = self.addon.getSettingBool("debug_mode")
+        self._realOnScan = True
 
     def get_ip(self):
         if not self.ip:
@@ -802,12 +776,18 @@ class GrailMonitor(xbmc.Monitor):
         if not self.uid:
             self.uid = fetch_installation_uid(self.addon)
         return self.uid
+    
+    def disallowRealOnScan(self):
+        self._realOnScan = False
+
+    def allowRealOnScan(self):
+        self._realOnScan = True
 
     def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
         latency = 300 if self.debug_mode else 300
         if self.debug_mode or force:
             xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,latency)
-        xbmc.log(f"{h}: {p}: {err}", x)
+        xbmc.log(f"JELLYGRAIL| {h}: {p}: {err}", x)
 
     def set_silent(self):
         self._ignore_changes = True
@@ -819,29 +799,44 @@ class GrailMonitor(xbmc.Monitor):
         global anyRefreshWorking
         global refresh_done
         if method == "VideoLibrary.OnScanStarted":
-            anyRefreshWorking = True
-            self.jgnotif("Scan|", "STARTED", True)
-            xbmc.log("[MyAddon] Scan started", xbmc.LOGINFO)
-
+            xbmc.sleep(100)
+            if self._realOnScan:
+                self.jgnotif("Scan|", "STARTED", True)
+                #anyRefreshWorking = True
+                
         if method == "VideoLibrary.OnScanFinished":
-            anyRefreshWorking = False
-            info = json.loads(data)
-            self.jgnotif("Scan|", f"FINISHED", True)
-            callSpecialOps(self)
+            xbmc.sleep(100)
+            if self._realOnScan:
+                self.jgnotif("Scan|", f"FINISHED", True)
+                anyRefreshWorking = False
+                callSpecialOps(self)
 
             # Trigger your asyncio/event here
             # event.set()
         if method == "VideoLibrary.OnUpdate":
             #self.jgnotif("Scan.NFOREFRESH", "NFOREFRESH", True)
-            #xbmc.log("[MyAddon] NFO updated", xbmc.LOGINFO)
+            xbmc.log("JellyGrail| one NFO updated", xbmc.LOGINFO)
             xbmc.sleep(1)
             refresh_done.set()
             xbmc.sleep(1)
 
+        if method == "Player.OnPlay":
+            self.jgnotif("Player|", "PLAY", True)
+
+        if method == "Player.OnStop":
+            self.jgnotif("Player|", "STOP", True)
+            callSpecialOps(self)
+
+        if method == "Player.OnPause":
+            self.jgnotif("Player|", "PAUSE", True)
+
+        if method == "Player.OnResume":
+            self.jgnotif("Player|", "RESUME", True)
+
     def onSettingsChanged(self):
 
         if self._ignore_changes:
-            xbmc.log("[context.kodi_grail] above var silently set", xbmc.LOGINFO)
+            xbmc.log("JellyGrail| above var silently set", xbmc.LOGINFO)
             return
         
         # if not silently set = if set in config
@@ -862,14 +857,14 @@ if __name__ == "__main__":
         xbmcaddon.Addon().openSettings()
     else:
         if dbVerified and not restartAsked:
-            monitor.jgnotif("Mysql|", "DB READY", True)
+            monitor.jgnotif("READY?|", "YES!", True)
 
 
             monitor.jgnotif("Too many notifs?", "disable debug in addon settings", False)
             askServerLoop(monitor)
 
         else:
-            monitor.jgnotif("Mysql|", "PENDING RESTART", True)
+            monitor.jgnotif("READY?|", "NO!, RESTART KODI", True)
             # long polling service....
             # what_should_i_do
             # -status
@@ -897,7 +892,7 @@ if __name__ == "__main__":
         thread.start()
     '''
 
-    #xbmc.log("[context.kodi_grail] init_context service started", xbmc.LOGINFO)
+    #xbmc.log("JellyGrail| init_context service started", xbmc.LOGINFO)
 
     # On attend la fin du service ou l'arrêt Kodi (la boucle principale reste utile si tu veux garder le service vivant)
 
@@ -925,7 +920,7 @@ def install_addon_from_dav(dav_url, local_filename=None):
         temp_dir = xbmcvfs.translatePath("special://home/cache/")
         local_path = os.path.join(temp_dir, local_filename)
 
-        xbmc.log(f"[context.kodi_grail] Téléchargement depuis {dav_url} vers {local_path}", xbmc.LOGINFO)
+        xbmc.log(f"JellyGrail| Téléchargement depuis {dav_url} vers {local_path}", xbmc.LOGINFO)
 
         # Lecture via xbmcvfs (Kodi gère WebDAV)
         src_file = xbmcvfs.File(dav_url, 'rb')
@@ -941,17 +936,17 @@ def install_addon_from_dav(dav_url, local_filename=None):
         src_file.close()
         dest_file.close()
 
-        xbmc.log(f"[context.kodi_grail] Téléchargement terminé : {local_path}", xbmc.LOGINFO)
+        xbmc.log(f"JellyGrail| Téléchargement terminé : {local_path}", xbmc.LOGINFO)
 
         # Installation de l'addon depuis le ZIP téléchargé
-        xbmc.log(f"[context.kodi_grail] Installation de {local_path}", xbmc.LOGINFO)
+        xbmc.log(f"JellyGrail| Installation de {local_path}", xbmc.LOGINFO)
         xbmc.executebuiltin(f'InstallAddonFromZip("{local_path}")')
 
         xbmcgui.Dialog().notification("Kodi Grail", f"Addon installé depuis {dav_url}", time=4000)
         return True
 
     except Exception as e:
-        xbmc.log(f"[context.kodi_grail] Erreur lors du téléchargement/installation: {e}", xbmc.LOGERROR)
+        xbmc.log(f"JellyGrail| Erreur lors du téléchargement/installation: {e}", xbmc.LOGERROR)
         xbmcgui.Dialog().notification("Kodi Grail", f"Erreur: {e}", time=5000)
         return False
 '''
@@ -961,12 +956,12 @@ def install_addon_from_http(url):
     temp_path = xbmc.translatePath("special://home/cache/")
     local_zip = os.path.join(temp_path, os.path.basename(url))
 
-    xbmc.log(f"[context.kodi_grail] Téléchargement direct HTTP depuis {url}", xbmc.LOGINFO)
+    xbmc.log(f"JellyGrail| Téléchargement direct HTTP depuis {url}", xbmc.LOGINFO)
 
     try:
         urllib.request.urlretrieve(url, local_zip)
-        xbmc.log(f"[context.kodi_grail] Téléchargement terminé : {local_zip}", xbmc.LOGINFO)
+        xbmc.log(f"JellyGrail| Téléchargement terminé : {local_zip}", xbmc.LOGINFO)
         xbmc.executebuiltin(f'InstallAddonFromZip("{local_zip}")')
     except Exception as e:
-        xbmc.log(f"[context.kodi_grail] Erreur téléchargement HTTP : {e}", xbmc.LOGERROR)
+        xbmc.log(f"JellyGrail| Erreur téléchargement HTTP : {e}", xbmc.LOGERROR)
 '''

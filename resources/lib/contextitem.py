@@ -2,6 +2,8 @@
 import sys
 from common import *
 
+
+
 def jgnotif(h, p, force = False, x = xbmc.LOGINFO, err = ""):
     latency = 300
     xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,latency)
@@ -75,9 +77,9 @@ def run():
             return
 
         if retr == 0 or retr == 1 or retr == 2:
-            title = xbmc.getInfoLabel("ListItem.Title") or "Inconnu"
-            dbid = xbmc.getInfoLabel("ListItem.DBID") or "N/A"
-            dbtype = xbmc.getInfoLabel("ListItem.DBTYPE") or "?"
+            title = xbmc.getInfoLabel("ListItem.Title") or "NOTITLE"
+            dbid = xbmc.getInfoLabel("ListItem.DBID") or "NOID"
+            dbtype = xbmc.getInfoLabel("ListItem.DBTYPE") or "NOVIDEOTYPE"
 
             message = (
                 f"ID : {dbid}\n"
