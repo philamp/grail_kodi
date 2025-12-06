@@ -401,7 +401,7 @@ def triggerNfoRefresh(monitor, full = False):
                 for id in ids:
                     
                     i = nfoDone / nfoTotal * 100
-                    pbar.update(int(i), message=f"Progress: {i}%")
+                    pbar.update(int(i), message=f"Progress: {int(i)}%")
 
                     payload = {
                         "jsonrpc": "2.0",
