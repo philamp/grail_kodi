@@ -4,11 +4,6 @@ from common import *
 
 
 
-def jgnotif(h, p, force = False, x = xbmc.LOGINFO, err = ""):
-    latency = 300
-    xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,latency)
-    xbmc.log(f"{h}: {p}: {err}", x)
-
 def deleteUidFile(addon):
 
     install_path = xbmcvfs.translatePath(addon.getAddonInfo("path"))
@@ -40,7 +35,7 @@ def setConfigToDefaults(addon):
 '''
 def safe_get(index, default=None):
     try:
-        jgnotif("sys.argv", f"index={index}, value={sys.argv[index]}")
+        jgnotifCT("sys.argv", f"index={index}, value={sys.argv[index]}")
         return sys.argv[index]
     except Exception:
         return default
@@ -63,20 +58,40 @@ def run():
         #xbmc.log(f"{LOG} called: action={action}, path={media_path}", xbmc.LOGINFO)
 
         dialog = xbmcgui.Dialog()
-        retr = dialog.contextmenu(['Retrieve Only', 'Retrive & Keep', 'WAF Play', 'Reset Add-on', 'Cancel'])
+        retr = dialog.contextmenu(['Retrieve Only', 'Retrive & Keep', 'WAF Play', 'Reset Add-on', 'Full NFO refresh', 'Cancel'])
 
-        if retr == -1 or retr == 4:
+        if retr == -1 or retr == 5:
             return
+        
+        if retr == 4:
+            base_url = get_base_urlCT(addon)
+            # full nfo refreshcall
+            if fetch_jg_infoCT(base_url, "/trigger_full_nfo_refresh", get_base_ident_paramsCT(addon), None):
+                jgnotifCT("Full NFO Refresh", "Triggered", True)
+
+
         if retr == 3:
             #xbmc.log(f"{LOG} User requested addon reset", xbmc.LOGINFO)
             deleteUidFile(addon)
             setConfigToDefaults(addon)
-            jgnotif("Add-on config", "Reinitialized", True)
+            jgnotifCT("Add-on config", "Reinitialized", True)
             askUserRestartCT("UID file deleted")
 
             return
 
         if retr == 0 or retr == 1 or retr == 2:
+
+            '''
+            pbar = xbmcgui.DialogProgressBG()
+            pbar.create("My Addon", "Preparing…")
+
+            for i in range(101):
+                pbar.update(i, message=f"Progress: {i}%")
+                time.sleep(0.05)
+
+            pbar.close()
+            '''
+            
             title = xbmc.getInfoLabel("ListItem.Title") or "NOTITLE"
             dbid = xbmc.getInfoLabel("ListItem.DBID") or "NOID"
             dbtype = xbmc.getInfoLabel("ListItem.DBTYPE") or "NOVIDEOTYPE"

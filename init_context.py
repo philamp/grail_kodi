@@ -6,9 +6,7 @@ import socket
 import struct
 import select
 import threading
-import time
 import zipfile
-import uuid
 import json
 from threading import Event
 
@@ -39,20 +37,6 @@ restartAsked = False
 viaProxy = False
 anyRefreshWorking = False
 refresh_done = Event()
-
-def fetch_installation_uid(addon):
-    install_path = xbmcvfs.translatePath(addon.getAddonInfo("path"))
-    uid_file = os.path.join(install_path, "addon_uuid.txt")
-
-    if xbmcvfs.exists(uid_file):
-        with xbmcvfs.File(uid_file) as f:
-            return f.read().strip()
-
-    unique_id = str(uuid.uuid4())
-    with xbmcvfs.File(uid_file, "w") as f:
-        f.write(unique_id)
-
-    return unique_id
 
 
 def patch_sources_webdav(ipport, roots = ["movies", "shows"]):
@@ -368,7 +352,7 @@ def get_typeid_with_reftype(refType):
     else:
         return "movieid"
 
-def triggerNfoRefresh(monitor):
+def triggerNfoRefresh(monitor, full = False):
     global anyRefreshWorking
     if not anyRefreshWorking:
         anyRefreshWorking = True
@@ -390,18 +374,34 @@ def triggerNfoRefresh(monitor):
         }
         '''
 
-        if not (result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=60)):
+        optfull = "&full=y" if full else ""
+
+        if not (result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}{optfull}", timeout=60)):
             monitor.jgnotif("NFOREFRESH|", "Triggered on server but no NFOs", False)
             anyRefreshWorking = False
             return
         
-        monitor.jgnotif("NFOREFRESH|", "(screen may flicker)", True)
+        monitor.jgnotif("NFOREFRESH|", "(screen may flicker)", False)
         # else
+
+        nfoTotal = 0
+        nfoDone = 0
+
+        for key, val in result.get("payload").items():
+            for refType, ids in val.items():
+                nfoTotal += len(ids)
+
+        if nfoTotal:
+            pbar = xbmcgui.DialogProgressBG()
+            pbar.create("}{ Updating Metadatas", "(screen may flicker)")
+
         for key, val in result.get("payload").items():
             for refType, ids in val.items():
                 typeid = get_typeid_with_reftype(refType)
                 for id in ids:
                     
+                    i = nfoDone / nfoTotal * 100
+                    pbar.update(int(i), message=f"Progress: {i}%")
 
                     payload = {
                         "jsonrpc": "2.0",
@@ -418,6 +418,7 @@ def triggerNfoRefresh(monitor):
                     #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
                     xbmc.sleep(10)
                     refresh_done.wait(timeout=6)
+                    nfoDone += 1
                     refresh_done.clear()
                     xbmc.sleep(10)
                     #monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", False)
@@ -425,7 +426,9 @@ def triggerNfoRefresh(monitor):
 
             # set this key is consumed:
             # call /set_consumed endpoint with batchid param:
-            fetch_jg_info(monitor, base_url, "/set_consumed", get_base_ident_params(monitor, jgtoken), f"&batchid={key}", timeout=10)
+            if not full:
+                fetch_jg_info(monitor, base_url, "/set_consumed", get_base_ident_params(monitor, jgtoken), f"&batchid={key}", timeout=10)
+            # else call to consume all! TODO
 
         # thanks to refresh_done event, use jssonrpc to trigger nforefresh per and wait for completion
 
@@ -453,7 +456,6 @@ def uiRefresh(monitor):
         "params": {"directory": "dummy/path/just/to/refresh"},
         "id": "1"
     }
-
     #ui refresh should not set refreshworking to false nor call again specialops in loop
     monitor.disallowRealOnScan()
     xbmc.sleep(100)
@@ -499,6 +501,13 @@ def askServerLoop(monitor):
                     thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor}, daemon=True)
                     thread.start()
 
+                elif result.get("fullNfoRefresh") == True:
+                    xbmc.log("JellyGrail| if fullnforefresh true", xbmc.LOGINFO)
+                    #triggerNfoRefresh(monitor)
+                    thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor, 'full': True}, daemon=True)
+                    thread.start()
+
+                # TODO probably useless
                 elif result.get("broken") == True:
                     xbmc.log("JellyGrail| entered broken", xbmc.LOGINFO)
                     break
