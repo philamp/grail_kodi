@@ -58,7 +58,7 @@ def run():
         #xbmc.log(f"{LOG} called: action={action}, path={media_path}", xbmc.LOGINFO)
 
         dialog = xbmcgui.Dialog()
-        retr = dialog.contextmenu(['Retrieve Only', 'Retrive & Keep', 'WAF Play', 'Reset Add-on', 'Full NFO refresh', 'Cancel'])
+        retr = dialog.contextmenu(['Retrieve Only', 'Keep locally', 'WAF Play', 'Reset Add-on', 'Full NFO refresh', 'Cancel'])
 
         if retr == -1 or retr == 5:
             return
