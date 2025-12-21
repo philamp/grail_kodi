@@ -52,6 +52,16 @@ def run():
     )
     '''
     try:
+
+        title = xbmc.getInfoLabel("ListItem.Title") or "NOTITLE"
+        dbid = xbmc.getInfoLabel("ListItem.DBID") or "NOID"
+        dbtype = xbmc.getInfoLabel("ListItem.DBTYPE") or "NOVIDEOTYPE"
+
+        base_url = get_base_urlCT(addon)
+
+        if receivedMenu := fetch_jg_infoCT(base_url, f"/get_cmenu_for/{dbtype}/{dbid}", get_base_ident_paramsCT(addon), None):
+            pass
+
         #action = safe_get(1, "unknown")
         #media_path = safe_get(2, "none")
 

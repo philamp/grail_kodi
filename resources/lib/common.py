@@ -32,7 +32,11 @@ def kodi_version():
 
 def jgnotifCT(h, p, force = False, x = xbmc.LOGINFO, err = ""):
     latency = 300
-    xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,latency)
+    if any((word in h.lower() for word in ["error", "warn", "fail"])):
+        type = xbmcgui.NOTIFICATION_ERROR
+    else:
+        type = xbmcgui.NOTIFICATION_INFO
+    xbmcgui.Dialog().notification("JG}{ "+h,p,type,latency)
     xbmc.log(f"{h}: {p}: {err}", x)
 
 

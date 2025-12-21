@@ -795,7 +795,11 @@ class GrailMonitor(xbmc.Monitor):
     def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
         latency = 300 if self.debug_mode else 300
         if self.debug_mode or force:
-            xbmcgui.Dialog().notification("JellyGrail| "+h,p,xbmcgui.NOTIFICATION_INFO,latency)
+            if any((word in h.lower() for word in ["error", "warn", "fail"])):
+                type = xbmcgui.NOTIFICATION_ERROR
+            else:
+                type = xbmcgui.NOTIFICATION_INFO
+            xbmcgui.Dialog().notification("JG}{ "+h,p,type,latency)
         xbmc.log(f"JELLYGRAIL| {h}: {p}: {err}", x)
 
     def set_silent(self):
