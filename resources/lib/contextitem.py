@@ -60,15 +60,20 @@ def run():
         base_url = get_base_urlCT(addon)
 
         if receivedMenu := fetch_jg_infoCT(base_url, f"/get_cmenu_for/{dbtype}/{dbid}", get_base_ident_paramsCT(addon), None):
-            pass
+            selectable = []
+            menu = []
+            for i, (key, val) in enumerate(receivedMenu.items()):
+                selectable.append(val)
+                menu.append(key)
+
 
         #action = safe_get(1, "unknown")
         #media_path = safe_get(2, "none")
 
         #xbmc.log(f"{LOG} called: action={action}, path={media_path}", xbmc.LOGINFO)
 
-        dialog = xbmcgui.Dialog()
-        retr = dialog.contextmenu(['Retrieve Only', 'Keep locally', 'WAF Play', 'Reset Add-on', 'Full NFO refresh', 'Cancel'])
+            dialog = xbmcgui.Dialog()
+            retr = dialog.contextmenu(menu)
 
         if retr == -1 or retr == 5:
             return
