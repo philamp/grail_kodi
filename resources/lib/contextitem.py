@@ -59,12 +59,17 @@ def run():
 
         base_url = get_base_urlCT(addon)
 
-        if receivedMenu := fetch_jg_infoCT(base_url, f"/get_cmenu_for/{dbtype}/{dbid}", get_base_ident_paramsCT(addon), None):
+        if receivedData := fetch_jg_infoCT(base_url, f"/get_cmenu_for/{dbtype}/{dbid}", get_base_ident_paramsCT(addon), None):
             selectable = []
             menu = []
-            for i, (key, val) in enumerate(receivedMenu['menu'].items()):
+            for i, (key, val) in enumerate(receivedData['menu'].items()):
                 selectable.append(val)
                 menu.append(key)
+
+
+        else:
+            menu = ["JG server response error"]
+
 
 
         #action = safe_get(1, "unknown")
@@ -72,52 +77,83 @@ def run():
 
         #xbmc.log(f"{LOG} called: action={action}, path={media_path}", xbmc.LOGINFO)
 
+        dialog = xbmcgui.Dialog()
+        resp = dialog.contextmenu(menu)
+
+
+        if resp == -1 or resp >= len(selectable) or resp == 1:
+            return
+
+
+        #'Trigger full scan': '#FULLSCAN',
+        #'Reset Add-on': '#RESETADDON',
+        #'Open Add-on settings': '#OPENSETTINGS'
+
+        if selectable[resp] == '#SUBMENU':
+            selectable = []
+            menu = []
+            for i, (key, val) in enumerate(receivedData['submenu'].items()):
+                selectable.append(val)
+                menu.append(key)
             dialog = xbmcgui.Dialog()
-            retr = dialog.contextmenu(menu)
-
-        if retr == -1 or retr == 5:
-            return
-        
-        if retr == 20:
-            base_url = get_base_urlCT(addon)
-            # full nfo refreshcall
-            if fetch_jg_infoCT(base_url, "/trigger_full_nfo_refresh", get_base_ident_paramsCT(addon), None):
-                jgnotifCT("Full NFO Refresh", "Triggered", True)
+            resp = dialog.contextmenu(menu)
 
 
-        if retr == 19:
-            #xbmc.log(f"{LOG} User requested addon reset", xbmc.LOGINFO)
-            deleteUidFile(addon)
-            setConfigToDefaults(addon)
-            jgnotifCT("Add-on config", "Reinitialized", True)
-            askUserRestartCT("UID file deleted")
 
-            return
+            if selectable[resp] == '#FULLNFOREFRESH':
+                if confirmPopinCT("Full NFO Refresh", "Are you sure you want to trigger a full NFO refresh? This may take a while."):
+                    base_url = get_base_urlCT(addon)
+                    # full nfo refreshcall
+                    if fetch_jg_infoCT(base_url, "/trigger_full_nfo_refresh", get_base_ident_paramsCT(addon), None):
+                        jgnotifCT("Full NFO Refresh", "Triggered", True)
+                return
 
-        if retr == 0 or retr == 1 or retr == 2:
 
-            '''
-            pbar = xbmcgui.DialogProgressBG()
-            pbar.create("My Addon", "Preparing…")
+            if selectable[resp] == '#FULLSCAN':
+                if confirmPopinCT("Full Scan", "Are you sure you want to trigger a full library scan? This may take a while."):
+                    base_url = get_base_urlCT(addon)
+                    # full scan call
+                    if fetch_jg_infoCT(base_url, "/ask_kodi_refresh", get_base_ident_paramsCT(addon), None):
+                        jgnotifCT("Full Scan", "Triggered", True)
+                return
 
-            for i in range(101):
-                pbar.update(i, message=f"Progress: {i}%")
-                time.sleep(0.05)
 
-            pbar.close()
-            '''
+            if selectable[resp] == '#OPENSETTINGS':
+                addon.openSettings()
+                return
             
-            title = xbmc.getInfoLabel("ListItem.Title") or "NOTITLE"
-            dbid = xbmc.getInfoLabel("ListItem.DBID") or "NOID"
-            dbtype = xbmc.getInfoLabel("ListItem.DBTYPE") or "NOVIDEOTYPE"
+            if selectable[resp] == '#RESETADDON':
+                if confirmPopinCT("Reset Add-on", "Are you sure you want to reset the add-on configuration? This will delete your UID file and set all settings to default. You will need to restart Kodi."):
+                    deleteUidFile(addon)
+                    setConfigToDefaults(addon)
+                    jgnotifCT("Add-on config", "Reinitialized", True)
+                    askUserRestartCT("Add-on reset")
+                return
+        
 
-            message = (
-                f"ID : {dbid}\n"
-                f"Titre : {title}\n"
-                f"Type : {dbtype}\n"
-            )
 
-            xbmcgui.Dialog().ok("JellyGrail", message)
+        '''
+        pbar = xbmcgui.DialogProgressBG()
+        pbar.create("My Addon", "Preparing…")
+
+        for i in range(101):
+            pbar.update(i, message=f"Progress: {i}%")
+            time.sleep(0.05)
+
+        pbar.close()
+        '''
+            
+        title = xbmc.getInfoLabel("ListItem.Title") or "NOTITLE"
+        dbid = xbmc.getInfoLabel("ListItem.DBID") or "NOID"
+        dbtype = xbmc.getInfoLabel("ListItem.DBTYPE") or "NOVIDEOTYPE"
+
+        message = (
+            f"ID : {dbid}\n"
+            f"Titre : {title}\n"
+            f"Type : {dbtype}\n"
+        )
+
+        xbmcgui.Dialog().ok("JellyGrail", message)
 
     except Exception as e:
         xbmc.log(f"{LOG} ERROR: {e}", xbmc.LOGERROR)

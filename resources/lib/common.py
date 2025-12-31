@@ -39,7 +39,9 @@ def jgnotifCT(h, p, force = False, x = xbmc.LOGINFO, err = ""):
     xbmcgui.Dialog().notification("JG}{ "+h,p,type,latency)
     xbmc.log(f"{h}: {p}: {err}", x)
 
-
+def confirmPopinCT(title, message):
+    dialog = xbmcgui.Dialog()
+    return dialog.yesno(title, message, yeslabel="Yes", nolabel="No")
 
 def askUserRestartCT(addedMsg=""):
     xbmcgui.Dialog().ok("JellyGrail| Restart needed", f"Please restart Kodi - {addedMsg}")
