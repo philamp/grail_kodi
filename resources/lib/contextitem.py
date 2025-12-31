@@ -62,7 +62,7 @@ def run():
         if receivedMenu := fetch_jg_infoCT(base_url, f"/get_cmenu_for/{dbtype}/{dbid}", get_base_ident_paramsCT(addon), None):
             selectable = []
             menu = []
-            for i, (key, val) in enumerate(receivedMenu.items()):
+            for i, (key, val) in enumerate(receivedMenu['menu'].items()):
                 selectable.append(val)
                 menu.append(key)
 
@@ -78,14 +78,14 @@ def run():
         if retr == -1 or retr == 5:
             return
         
-        if retr == 4:
+        if retr == 20:
             base_url = get_base_urlCT(addon)
             # full nfo refreshcall
             if fetch_jg_infoCT(base_url, "/trigger_full_nfo_refresh", get_base_ident_paramsCT(addon), None):
                 jgnotifCT("Full NFO Refresh", "Triggered", True)
 
 
-        if retr == 3:
+        if retr == 19:
             #xbmc.log(f"{LOG} User requested addon reset", xbmc.LOGINFO)
             deleteUidFile(addon)
             setConfigToDefaults(addon)
