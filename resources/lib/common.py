@@ -1,12 +1,12 @@
 import xbmc
 import xbmcgui
 import xbmcvfs
-import xbmcaddon
+#import xbmcaddon
 import os
 import urllib.request
 import urllib.error
 import json
-import time
+#import time
 import uuid
 
 VERSION="20250808"
@@ -94,15 +94,32 @@ def fetch_jg_info(monitor, base_url, path, params, optionalparams = None, timeou
         #xbmc.log(f"[context.kodi_grail] Fetch failed {path}: {e}", xbmc.LOGERROR)
         return None
 
-def fetch_jg_infoCT(base_url, path, params, optionalparams = None, timeout=5):
+def fetch_jg_infoCT(base_url, path, params, optionalparams = None, timeout=5, json_data=None):
 
     
     url = base_url + path + params
     url += optionalparams if optionalparams is not None else ""
 
     try:
+        headers = {}
+        data = None
+
+        if json_data is not None:
+            data = json.dumps(json_data).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+            method = "POST"
+        else:
+            method = "GET"
+
+        request = urllib.request.Request(
+            url,
+            data=data,
+            headers=headers,
+            method=method
+        )
+
         xbmc.log(f"[context.kodi_grail] Fetch : {url}", xbmc.LOGINFO)
-        with urllib.request.urlopen(url, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             data = response.read().decode("utf-8")
         result = json.loads(data)
         return result

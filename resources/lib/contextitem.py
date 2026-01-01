@@ -89,6 +89,35 @@ def run():
         #'Reset Add-on': '#RESETADDON',
         #'Open Add-on settings': '#OPENSETTINGS'
 
+        if selectable[resp] == '#KEEPLOCAL' or selectable[resp] == '#KEEPLOCALUHD':
+            Ltpl = ""
+            Qtpl = ""
+
+            Lpolicy = 1
+            if confirmPopinCT("Preferred audio needed ?", "Do you also want to keep the preferred audio version of this movie (if found) ?"):
+                Lpolicy = 2
+                Ltpl = ' with pref audio'
+            
+            
+            Qpolicy = 1
+            if selectable[resp] == '#KEEPLOCALUHD':
+                Qpolicy = 2
+                Qtpl = ' in UHD'
+
+
+            payload = {
+                'Qpolicy': Qpolicy,
+                'Lpolicy': Lpolicy,
+                'parentPaths': receivedData['payload']
+            }
+
+            if fetch_jg_infoCT(base_url, '/set_policy', get_base_ident_paramsCT(addon), None, timeout=10, json_data=payload):
+                jgnotifCT(f"Keeping {dbtype}|", f"{title}{Qtpl}{Ltpl}", True)                
+
+            return
+
+
+
         if selectable[resp] == '#SUBMENU':
             selectable = []
             menu = []
