@@ -1,12 +1,12 @@
 import xbmc
 import xbmcgui
 import xbmcvfs
-#import xbmcaddon
+import xbmcaddon
 import os
 import urllib.request
 import urllib.error
 import json
-#import time
+import time
 import uuid
 
 VERSION="20250808"
