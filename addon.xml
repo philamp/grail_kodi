@@ -1,6 +1,6 @@
 <addon id="context.kodi_grail"
        name="Kodi Grail Context Menu"
-       version="1.0.3"
+       version="202601"
        provider-name="You">
 
   <requires>

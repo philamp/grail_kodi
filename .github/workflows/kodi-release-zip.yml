@@ -1,0 +1,59 @@
+name: Build Kodi add-on zip
+
+on:
+  push:
+    tags:
+      - "2026*"
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read addon id and version from addon.xml
+        id: meta
+        run: |
+          ADDON_ID=$(python - <<'PY'
+import xml.etree.ElementTree as ET
+root = ET.parse("addon.xml").getroot()
+print(root.attrib["id"])
+PY
+          )
+          ADDON_VER=$(python - <<'PY'
+import xml.etree.ElementTree as ET
+root = ET.parse("addon.xml").getroot()
+print(root.attrib["version"])
+PY
+          )
+          echo "addon_id=$ADDON_ID" >> "$GITHUB_OUTPUT"
+          echo "addon_ver=$ADDON_VER" >> "$GITHUB_OUTPUT"
+
+      - name: Create Kodi-compatible zip (parent folder = addon id)
+        run: |
+          set -e
+          ADDON_ID="${{ steps.meta.outputs.addon_id }}"
+          ADDON_VER="${{ steps.meta.outputs.addon_ver }}"
+          ZIP_NAME="${ADDON_ID}-${ADDON_VER}.zip"
+
+          mkdir -p "build/${ADDON_ID}"
+          rsync -a --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude ".gitignore" \
+            --exclude "build" \
+            ./ "build/${ADDON_ID}/"
+
+          (cd build && zip -r "../${ZIP_NAME}" "${ADDON_ID}")
+
+          echo "Created ${ZIP_NAME}"
+          ls -lh "${ZIP_NAME}"
+
+      - name: Create GitHub Release and upload zip
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.zip"
