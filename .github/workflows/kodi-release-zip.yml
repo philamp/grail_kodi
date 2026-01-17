@@ -18,20 +18,27 @@ jobs:
       - name: Read addon id and version from addon.xml
         id: meta
         run: |
-          ADDON_ID=$(python - <<'PY'
-import xml.etree.ElementTree as ET
-root = ET.parse("addon.xml").getroot()
-print(root.attrib["id"])
-PY
-          )
-          ADDON_VER=$(python - <<'PY'
-import xml.etree.ElementTree as ET
-root = ET.parse("addon.xml").getroot()
-print(root.attrib["version"])
-PY
-          )
-          echo "addon_id=$ADDON_ID" >> "$GITHUB_OUTPUT"
-          echo "addon_ver=$ADDON_VER" >> "$GITHUB_OUTPUT"
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("addon.xml").getroot()
+          addon_id = root.attrib["id"]
+          addon_ver = root.attrib["version"]
+          print(f"addon_id={addon_id}")
+          print(f"addon_ver={addon_ver}")
+          PY
+
+          # Write to GITHUB_OUTPUT (the correct way to set step outputs)
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          import os
+          root = ET.parse("addon.xml").getroot()
+          addon_id = root.attrib["id"]
+          addon_ver = root.attrib["version"]
+          out = os.environ["GITHUB_OUTPUT"]
+          with open(out, "a", encoding="utf-8") as f:
+            f.write(f"addon_id={addon_id}\n")
+            f.write(f"addon_ver={addon_ver}\n")
+          PY
 
       - name: Create Kodi-compatible zip (parent folder = addon id)
         run: |
