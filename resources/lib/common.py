@@ -59,7 +59,7 @@ def get_base_urlCT(addon):
     return base_url
 
 def get_base_ident_paramsCT(addon):
-    return f"?token={addon.getSettingString("jgtoken")}&uid={fetch_installation_uid(addon)}"
+    return f'?token={addon.getSettingString("jgtoken")}&uid={fetch_installation_uid(addon)}'
 
 
 def fetch_jg_info(monitor, base_url, path, params, optionalparams = None, timeout=5):
