@@ -35,8 +35,6 @@ if not mysql_reachable():
 dbVerified = None
 restartAsked = False
 viaProxy = False
-anyRefreshWorking = False
-refresh_done = Event()
 
 
 def patch_sources_webdav(ipport, roots = ["movies", "shows"]):
@@ -353,100 +351,104 @@ def get_typeid_with_reftype(refType):
         return "movieid"
 
 def triggerNfoRefresh(monitor, full = False):
-    global anyRefreshWorking
-    if not anyRefreshWorking:
-        anyRefreshWorking = True
+    xbmc.sleep(10)
 
-        base_url = get_base_or_dav_url(monitor)
-        jgtoken = monitor.addon.getSettingString("jgtoken")
+    # else
+    pbar = None
 
-        # structure of result is :
-        '''
-        {
-            "payload": {
-                "243": {
-                "Movie": [45, 58, 62],
-                "TVShow": [12, 14],
-                "Episode": [101, 102, 103]
-                }
+    base_url = get_base_or_dav_url(monitor)
+    jgtoken = monitor.addon.getSettingString("jgtoken")
+
+    # structure of result is :
+    '''
+    {
+        "payload": {
+            "243": {
+            "Movie": [45, 58, 62],
+            "TVShow": [12, 14],
+            "Episode": [101, 102, 103]
             }
-            "status": 201
         }
-        '''
+        "status": 201
+    }
+    '''
 
-        optfull = "&full=y" if full else ""
+    optfull = "&full=y" if full else ""
 
-        if not (result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}{optfull}", timeout=60)):
-            monitor.jgnotif("NFOREFRESH|", "Triggered on server but no NFOs", False)
-            anyRefreshWorking = False
-            return
-        
-        monitor.jgnotif("NFOREFRESH|", "(screen may flicker)", False)
-        # else
+    if not (result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}{optfull}", timeout=60)):
+        monitor.jgnotif("NFOREFRESH|", "Triggered on server but no NFOs", False)
+        monitor.semRelease()
+        return
+    
+    monitor.jgnotif("NFOREFRESH|", "(screen may flicker)", False)
+    # else
 
-        nfoTotal = 0
-        nfoDone = 0
+    nfoTotal = 0
+    nfoDone = 0
 
-        for key, val in result.get("payload").items():
-            for refType, ids in val.items():
-                nfoTotal += len(ids)
+    for key, val in result.get("payload").items():
+        for refType, ids in val.items():
+            nfoTotal += len(ids)
 
-        if nfoTotal:
-            pbar = xbmcgui.DialogProgressBG()
-            pbar.create("}{ Updating Metadatas", "(screen may flicker)")
+    if nfoTotal:
+        pbar = xbmcgui.DialogProgressBG()
+        pbar.create("}{ Updating Metadatas ", "(screen may flicker)")
+        pbar.update(0, message=f"0/{nfoTotal}")
+    else:
+        monitor.semRelease()
+        return
 
-        for key, val in result.get("payload").items():
-            for refType, ids in val.items():
-                typeid = get_typeid_with_reftype(refType)
-                for id in ids:
-                    
+    for key, val in result.get("payload").items():
+        for refType, ids in val.items():
+            typeid = get_typeid_with_reftype(refType)
+            for id in ids:
+                if pbar:
                     i = nfoDone / nfoTotal * 100
-                    pbar.update(int(i), message=f"Progress: {int(i)}%")
+                    pbar.update(int(i), message=f"{nfoDone}/{nfoTotal}")
 
-                    payload = {
-                        "jsonrpc": "2.0",
-                        "id": "1",
-                        "method": f"VideoLibrary.Refresh{refType}",
-                        "params": {
-                            typeid: id
-                        }
+                payload = {
+                    "jsonrpc": "2.0",
+                    "id": "1",
+                    "method": f"VideoLibrary.Refresh{refType}",
+                    "params": {
+                        typeid: id
                     }
+                }
 
 
-                    xbmc.executeJSONRPC(json.dumps(payload))
+                xbmc.executeJSONRPC(json.dumps(payload))
 
-                    #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
-                    xbmc.sleep(10)
-                    refresh_done.wait(timeout=6)
-                    nfoDone += 1
-                    refresh_done.clear()
-                    xbmc.sleep(10)
-                    #monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", False)
-                    
+                #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
+                xbmc.sleep(10)
+                monitor.wait_for_refresh_done()
+                nfoDone += 1
+                monitor.clear_refresh_done()
+                xbmc.sleep(10)
+                #monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", False)
+                
 
-            # set this key is consumed:
-            # call /set_consumed endpoint with batchid param:
-            if not full:
-                fetch_jg_info(monitor, base_url, "/set_consumed", get_base_ident_params(monitor, jgtoken), f"&batchid={key}", timeout=10)
-            # else call to consume all! TODO
+        # set this key is consumed:
+        # call /set_consumed endpoint with batchid param:
+        if not full:
+            fetch_jg_info(monitor, base_url, "/set_consumed", get_base_ident_params(monitor, jgtoken), f"&batchid={key}", timeout=10)
 
-        # thanks to refresh_done event, use jssonrpc to trigger nforefresh per and wait for completion
+    # thanks to refresh_done event, use jssonrpc to trigger nforefresh per and wait for completion
+    pbar.update(100, message=f"{nfoDone}/{nfoTotal}")
 
-        anyRefreshWorking = False
-        monitor.jgnotif("NFOREFRESH|", "Completed", True)
-        callSpecialOps(monitor)
+    monitor.semRelease()
+    xbmc.sleep(100)
+    monitor.jgnotif("NFOREFRESH|", "Completed", True)
+    pbar.close()
+    callSpecialOps(monitor)
+    return
 
 def triggerScan(monitor):
 
-    global anyRefreshWorking
-
-    if not anyRefreshWorking:
-        anyRefreshWorking = True # set it here in addition to event listener in monitor
-        monitor.jgnotif("Scan|", "Triggered", False)
-        xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
+    xbmc.sleep(100)
+    monitor.jgnotif("Scan|", "Triggered", False)
+    xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
         
-    else:
-        monitor.jgnotif("Scan|", "ALREADY SCANNING", True) # should not happen
+
 
 def uiRefresh(monitor):
 
@@ -460,11 +462,16 @@ def uiRefresh(monitor):
     monitor.disallowRealOnScan()
     xbmc.sleep(100)
     xbmc.executeJSONRPC(json.dumps(payload))
-    xbmc.sleep(100)
+    xbmc.sleep(1000)
     monitor.allowRealOnScan()
 
 def callSpecialOps(monitor):
 
+    if time.time() - monitor.last_special_ops_call() < 5:
+        monitor.jgnotif("SpecialOps|", "Bypassed", False)
+        return
+
+    monitor.set_last_special_ops_call(time.time())
     base_url = get_base_or_dav_url(monitor)
     jgtoken = monitor.addon.getSettingString("jgtoken")
 
@@ -486,40 +493,42 @@ def askServerLoop(monitor):
     while not monitor.abortRequested() and dbVerified is not None:
         #break #TODO temp toremove
         xbmc.sleep(100) #wait 0.1s between loops
-        if not anyRefreshWorking: 
-            if result := fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
-                xbmc.log("JellyGrail| entered result", xbmc.LOGINFO)
+        if not monitor.semAcquire():
+            continue
 
-                if result.get("scan") == True:
-                    xbmc.log("JellyGrail| if scan true", xbmc.LOGINFO)
-                    triggerScan(monitor)
-                    #xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
+        if result := fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
+            xbmc.log("JellyGrail| entered result", xbmc.LOGINFO)
 
-                elif result.get("nforefresh") == True:
-                    xbmc.log("JellyGrail| if nforefresh true", xbmc.LOGINFO)
-                    #triggerNfoRefresh(monitor)
-                    thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor}, daemon=True)
-                    thread.start()
+            if result.get("scan") == True:
+                xbmc.log("JellyGrail| if scan true", xbmc.LOGINFO)
+                triggerScan(monitor)
+                #xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
 
-                elif result.get("fullNfoRefresh") == True:
-                    xbmc.log("JellyGrail| if fullnforefresh true", xbmc.LOGINFO)
-                    #triggerNfoRefresh(monitor)
-                    thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor, 'full': True}, daemon=True)
-                    thread.start()
+            elif result.get("nforefresh") == True:
+                xbmc.log("JellyGrail| if nforefresh true", xbmc.LOGINFO)
+                #triggerNfoRefresh(monitor)
+                thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor}, daemon=True)
+                thread.start()
 
-                # TODO probably useless
-                elif result.get("broken") == True:
-                    xbmc.log("JellyGrail| entered broken", xbmc.LOGINFO)
-                    break
+            elif result.get("fullNfoRefresh") == True:
+                xbmc.log("JellyGrail| if fullnforefresh true", xbmc.LOGINFO)
+                #triggerNfoRefresh(monitor)
+                thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor, 'full': True}, daemon=True)
+                thread.start()
 
-                else:
-                    #monitor.jgnotif("Idle|", "No action needed", False)
-                    pass
+            # TODO probably useless
+            elif result.get("broken") == True:
+                xbmc.log("JellyGrail| entered broken", xbmc.LOGINFO)
+                monitor.semRelease()
+                break
 
             else:
-                monitor.jgnotif("Error|", "Critical: server broken", True)
-                askUserRestart("Jellygrail Server broken, please restart it as well")
-                break
+                monitor.semRelease()
+
+        else:
+            monitor.jgnotif("Error|", "Critical: server broken", True)
+            askUserRestart("Jellygrail Server broken, please restart it as well")
+            break
 
 
 
@@ -774,7 +783,28 @@ class GrailMonitor(xbmc.Monitor):
         self.uid = None
         self._ignore_changes = False
         self.debug_mode = self.addon.getSettingBool("debug_mode")
-        self._realOnScan = True
+        self._realOnScan = threading.Semaphore(1)
+        self._refresh_done = Event()
+        self._sem = threading.Semaphore(1)
+        self._last_special_ops = time.time() - 10
+
+    def wait_for_refresh_done(self):
+        self._refresh_done.wait(timeout=6)
+    
+    def clear_refresh_done(self):
+        self._refresh_done.clear()
+
+    def last_special_ops_call(self):
+        return self._last_special_ops
+    
+    def set_last_special_ops_call(self, t):
+        self._last_special_ops = t
+
+    def semAcquire(self):
+        return self._sem.acquire(blocking=False)
+    
+    def semRelease(self):
+        self._sem.release()
 
     def get_ip(self):
         if not self.ip:
@@ -787,10 +817,10 @@ class GrailMonitor(xbmc.Monitor):
         return self.uid
     
     def disallowRealOnScan(self):
-        self._realOnScan = False
+        return self._realOnScan.acquire(blocking=False)
 
     def allowRealOnScan(self):
-        self._realOnScan = True
+        self._realOnScan.release()
 
     def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
         latency = 300 if self.debug_mode else 300
@@ -799,7 +829,7 @@ class GrailMonitor(xbmc.Monitor):
                 type = xbmcgui.NOTIFICATION_ERROR
             else:
                 type = xbmcgui.NOTIFICATION_INFO
-            xbmcgui.Dialog().notification("JG}{ "+h,p,type,latency)
+            xbmcgui.Dialog().notification("}{ "+h,p,type,latency)
         xbmc.log(f"JELLYGRAIL| {h}: {p}: {err}", x)
 
     def set_silent(self):
@@ -809,42 +839,43 @@ class GrailMonitor(xbmc.Monitor):
         self._ignore_changes = False
 
     def onNotification(self, sender, method, data):
-        global anyRefreshWorking
-        global refresh_done
         if method == "VideoLibrary.OnScanStarted":
-            xbmc.sleep(100)
-            if self._realOnScan:
+            if self.disallowRealOnScan():
                 self.jgnotif("Scan|", "STARTED", True)
-                #anyRefreshWorking = True
+            return
                 
         if method == "VideoLibrary.OnScanFinished":
-            xbmc.sleep(100)
-            if self._realOnScan:
+            if self.disallowRealOnScan():
                 self.jgnotif("Scan|", f"FINISHED", True)
-                anyRefreshWorking = False
+                self.semRelease()
                 callSpecialOps(self)
+            return
 
             # Trigger your asyncio/event here
             # event.set()
         if method == "VideoLibrary.OnUpdate":
             #self.jgnotif("Scan.NFOREFRESH", "NFOREFRESH", True)
-            xbmc.log("JellyGrail| one NFO updated", xbmc.LOGINFO)
-            xbmc.sleep(1)
-            refresh_done.set()
-            xbmc.sleep(1)
-
+            #xbmc.log("JellyGrail| one NFO updated", xbmc.LOGINFO)
+            xbmc.sleep(5)
+            self._refresh_done.set()
+            return
+        
         if method == "Player.OnPlay":
             self.jgnotif("Player|", "PLAY", True)
+            return
 
         if method == "Player.OnStop":
             self.jgnotif("Player|", "STOP", True)
             callSpecialOps(self)
+            return
 
         if method == "Player.OnPause":
             self.jgnotif("Player|", "PAUSE", True)
+            return
 
         if method == "Player.OnResume":
             self.jgnotif("Player|", "RESUME", True)
+            return
 
     def onSettingsChanged(self):
 

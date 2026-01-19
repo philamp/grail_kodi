@@ -1,6 +1,6 @@
 <addon id="context.kodi_grail"
        name="Kodi Grail Context Menu"
-       version="202601"
+       version="20260119"
        provider-name="You">
 
   <requires>
@@ -11,7 +11,7 @@
   <extension point="kodi.context.item">
     <menu id="kodi.core.main">
       <item library="resources/lib/contextitem.py" condition="true">
-        <label>} JellyGrail {</label>
+        <label>}{ JellyGrail Menu</label>
         <visible>true</visible>
       </item>
     </menu>
