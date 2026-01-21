@@ -389,14 +389,17 @@ def triggerNfoRefresh(monitor, full = False):
     for key, val in result.get("payload").items():
         for refType, ids in val.items():
             nfoTotal += len(ids)
-
+    '''
     if nfoTotal:
-        pbar = xbmcgui.DialogProgressBG()
-        pbar.create("}{ Updating Metadatas ", "(screen may flicker)")
-        pbar.update(0, message=f"0/{nfoTotal}")
+
     else:
         monitor.semRelease()
         return
+    '''
+
+    pbar = xbmcgui.DialogProgressBG()
+    pbar.create("}{ Updating Metadatas ", "(screen may flicker)")
+    pbar.update(0, message=f"0/{nfoTotal}")
 
     for key, val in result.get("payload").items():
         for refType, ids in val.items():
