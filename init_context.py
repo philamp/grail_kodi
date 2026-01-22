@@ -467,8 +467,7 @@ def uiRefresh(monitor):
     #monitor.acquireRealOnScan()
     monitor.setFlag()
     xbmc.executeJSONRPC(json.dumps(payload))
-    xbmc.sleep(4000)
-    monitor.clearFlag()
+    
     #monitor.allowRealOnScan()
 
 def callSpecialOps(monitor):
@@ -874,6 +873,7 @@ class GrailMonitor(xbmc.Monitor):
                 
         if method == "VideoLibrary.OnScanFinished":
             if self._flag.is_set():
+                monitor.clearFlag()
                 return
             else:
                 self.semRelease()
