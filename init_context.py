@@ -438,15 +438,17 @@ def triggerNfoRefresh(monitor, full = False):
     # thanks to refresh_done event, use jssonrpc to trigger nforefresh per and wait for completion
     pbar.update(100, message=f"{nfoDone}/{nfoTotal}")
 
-    monitor.semRelease()
+    #monitor.semRelease()
     xbmc.sleep(100)
     monitor.jgnotif("NFOREFRESH|", "Completed", True)
     pbar.close()
+    monitor.semRelease()
     callSpecialOps(monitor)
+    
     return
 
 def triggerScan(monitor):
-
+    #monitor.allowRealOnScan()
     xbmc.sleep(100)
     monitor.jgnotif("Scan|", "Triggered", False)
     xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
@@ -462,30 +464,41 @@ def uiRefresh(monitor):
         "id": "1"
     }
     #ui refresh should not set refreshworking to false nor call again specialops in loop
-    monitor.disallowRealOnScan()
-    xbmc.sleep(100)
+    #monitor.acquireRealOnScan()
+    monitor.setFlag()
     xbmc.executeJSONRPC(json.dumps(payload))
-    xbmc.sleep(1000)
-    monitor.allowRealOnScan()
+    xbmc.sleep(4000)
+    monitor.clearFlag()
+    #monitor.allowRealOnScan()
 
 def callSpecialOps(monitor):
 
+    
+
+    # additional safety to avoid multiple calls in a short time
     if time.time() - monitor.last_special_ops_call() < 5:
         monitor.jgnotif("SpecialOps|", "Bypassed", False)
-        return
-
-    monitor.set_last_special_ops_call(time.time())
-    base_url = get_base_or_dav_url(monitor)
-    jgtoken = monitor.addon.getSettingString("jgtoken")
-
-    if result := fetch_jg_info(monitor, base_url, "/special_ops", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
-        if result.get("status") == 201:
-            monitor.jgnotif("SpecialOps|", "Completed", False)
-            uiRefresh(monitor)
-        else:
-            monitor.jgnotif("SpecialOps|", "No ops to do", False)
+        #monitor.allowRealOnScan()
     else:
-        monitor.jgnotif("SpecialOps|", "Error contacting server", True)
+    
+        
+
+        monitor.set_last_special_ops_call(time.time())
+        base_url = get_base_or_dav_url(monitor)
+        jgtoken = monitor.addon.getSettingString("jgtoken")
+
+        if result := fetch_jg_info(monitor, base_url, "/special_ops", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
+            if result.get("status") == 201:
+                monitor.jgnotif("SpecialOps|", "Completed", False)
+                uiRefresh(monitor)
+            else:
+                monitor.jgnotif("SpecialOps|", "No ops to do", False)
+        else:
+            monitor.jgnotif("SpecialOps|", "Error contacting server", True)
+
+    
+    
+    #monitor.allowRealOnScan()
 
 def askServerLoop(monitor):
 
@@ -787,6 +800,7 @@ class GrailMonitor(xbmc.Monitor):
         self._ignore_changes = False
         self.debug_mode = self.addon.getSettingBool("debug_mode")
         self._realOnScan = threading.Semaphore(1)
+        self._flag = threading.Event()
         self._refresh_done = Event()
         self._sem = threading.Semaphore(1)
         self._last_special_ops = time.time() - 10
@@ -819,12 +833,22 @@ class GrailMonitor(xbmc.Monitor):
             self.uid = fetch_installation_uid(self.addon)
         return self.uid
     
-    def disallowRealOnScan(self):
+    '''
+    def acquireRealOnScan(self):
         return self._realOnScan.acquire(blocking=False)
+    '''
 
+    def setFlag(self):
+        self._flag.set()
+
+    def clearFlag(self):
+        self._flag.clear()
+
+    '''
     def allowRealOnScan(self):
+        xbmc.sleep(2000)
         self._realOnScan.release()
-
+    '''
     def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
         latency = 300 if self.debug_mode else 300
         if self.debug_mode or force:
@@ -843,16 +867,21 @@ class GrailMonitor(xbmc.Monitor):
 
     def onNotification(self, sender, method, data):
         if method == "VideoLibrary.OnScanStarted":
-            if self.disallowRealOnScan():
-                self.jgnotif("Scan|", "STARTED", True)
-            return
+            #if self.acquireRealOnScan():
+            #    self.jgnotif("Scan|", "STARTED", True)
+            #return
+            pass
                 
         if method == "VideoLibrary.OnScanFinished":
-            if self.disallowRealOnScan():
-                self.jgnotif("Scan|", f"FINISHED", True)
+            if self._flag.is_set():
+                return
+            else:
                 self.semRelease()
+                # allow server loop to continue
+                monitor.jgnotif("Scan|", f"FINISHED", True)
                 callSpecialOps(self)
-            return
+                xbmc.sleep(100)
+                return
 
             # Trigger your asyncio/event here
             # event.set()
