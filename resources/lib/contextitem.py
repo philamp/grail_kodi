@@ -59,16 +59,21 @@ def run():
 
         base_url = get_base_urlCT(addon)
 
+        preflang = "preferred language"
+
         if receivedData := fetch_jg_infoCT(base_url, f"/get_cmenu_for/{dbtype}/{dbid}", get_base_ident_paramsCT(addon), None):
             selectable = []
             menu = []
-            for i, (key, val) in enumerate(receivedData['menu'].items()):
+            for _, (key, val) in enumerate(receivedData['menu'].items()):
                 selectable.append(val)
                 menu.append(key)
-
+            
+            preflang = receivedData.get('preflang', preflang)
 
         else:
             menu = ["JG server response error"]
+
+
 
 
 
@@ -94,7 +99,7 @@ def run():
             Qtpl = ""
 
             Lpolicy = 1
-            if confirmPopinCT("Preferred audio needed ?", "Do you also want to keep the preferred audio version of this movie (if found) ?"):
+            if confirmPopinCT("Preferred audio needed ?", f"Do you also want to keep the {preflang} AUDIO version of this movie (if found) ?"):
                 Lpolicy = 2
                 Ltpl = ' with pref audio'
             

@@ -467,6 +467,8 @@ def uiRefresh(monitor):
     #monitor.acquireRealOnScan()
     monitor.setFlag()
     xbmc.executeJSONRPC(json.dumps(payload))
+    xbmc.sleep(5000)
+    monitor.clearFlag()
     
     #monitor.allowRealOnScan()
 
