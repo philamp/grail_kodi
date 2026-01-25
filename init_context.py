@@ -878,6 +878,7 @@ class GrailMonitor(xbmc.Monitor):
                 monitor.clearFlag()
                 return
             else:
+                xbmc.sleep(3000)
                 self.semRelease()
                 # allow server loop to continue
                 monitor.jgnotif("Scan|", f"FINISHED", True)
