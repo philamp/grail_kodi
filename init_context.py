@@ -817,7 +817,6 @@ class GrailMonitor(xbmc.Monitor):
         self.debug_mode = self.addon.getSettingBool("debug_mode")
         self._realOnScan = threading.Semaphore(1)
         self._flag = threading.Event()
-        self._refresh_done = threading.Event() #maybe deprecated
         self._refSem = threading.Semaphore(1)
         self._sem = threading.Semaphore(1)
         self._last_special_ops = time.time() - 10
@@ -833,6 +832,7 @@ class GrailMonitor(xbmc.Monitor):
 
 
     #maybe deprecated
+    '''
     def get_ref_event(self):
         return self._refresh_done
 
@@ -841,6 +841,7 @@ class GrailMonitor(xbmc.Monitor):
     
     def clear_refresh_done(self):
         self._refresh_done.clear()
+    '''
 
 
 
