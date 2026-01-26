@@ -135,11 +135,15 @@ def run():
 
 
             if selectable[resp] == '#FULLNFOREFRESH':
-                if confirmPopinCT("Full NFO Refresh", "Are you sure you want to trigger a full NFO refresh? This may take a while."):
+                if confirmPopinCT("Full NFO Refresh", "Are you sure you want to trigger a full NFO refresh? This may take a while. Please wait for the batch to be generated on server side"):
                     base_url = get_base_urlCT(addon)
                     # full nfo refreshcall
                     if fetch_jg_infoCT(base_url, "/trigger_full_nfo_refresh", get_base_ident_paramsCT(addon), None):
                         jgnotifCT("Full NFO Refresh", "Triggered", True)
+                        
+                        xbmc.executebuiltin('ActivateWindow(Settings)')
+                        xbmc.sleep(2000)
+                        jgnotifCT("Full NFO Refresh", "Please wait for the server to respond", True)
                 return
 
 

@@ -8,7 +8,6 @@ import select
 import threading
 import zipfile
 import json
-from threading import Event
 
 
 '''
@@ -401,10 +400,12 @@ def triggerNfoRefresh(monitor, full = False):
     pbar.create("}{ Updating Metadatas ", "(screen may flicker)")
     pbar.update(0, message=f"0/{nfoTotal}")
 
+    dtimeout = 6
     for key, val in result.get("payload").items():
         for refType, ids in val.items():
             typeid = get_typeid_with_reftype(refType)
             for id in ids:
+                
                 if pbar:
                     i = nfoDone / nfoTotal * 100
                     pbar.update(int(i), message=f"{nfoDone}/{nfoTotal}")
@@ -419,14 +420,28 @@ def triggerNfoRefresh(monitor, full = False):
                 }
 
 
+                if not monitor.refSemAcquire(ptimeout=dtimeout):
+                    if(nfoDone == 1):
+                        monitor.jgnotif("NFOREFRESH|", f"Semaphore fail, set short timeout", True)
+                    dtimeout = 1
+                else:
+                    if(nfoDone == 1):
+                        monitor.jgnotif("NFOREFRESH|", f"Semaphore OK", False)
+                    dtimeout = 6
+
                 xbmc.executeJSONRPC(json.dumps(payload))
+                nfoDone += 1
+
+
 
                 #xbmc.executeJSONRPC(f'{{jsonrpc": "2.0", "method": "VideoLibrary.Refresh{refType}","params": {{"{typeid}": {id}}},"id": "1"}}')
-                xbmc.sleep(10)
-                monitor.wait_for_refresh_done()
-                nfoDone += 1
-                monitor.clear_refresh_done()
-                xbmc.sleep(10)
+                #xbmc.sleep(10)
+                
+                #monitor.wait_for_refresh_done(ptimeout=dtimeout)
+                #nfoDone += 1
+                #monitor.clear_refresh_done()
+                
+                #xbmc.sleep(10)
                 #monitor.jgnotif("NFOREFRESH|", f"{typeid}:{id} refreshed", False)
                 
 
@@ -590,7 +605,7 @@ def init(monitor):
         if not config_set:
             xbmcgui.Dialog().ok("JellyGrail", f"New installation, server discovery (during 10s max)")
         else:
-            xbmcgui.Dialog().ok("JellyGrail", f"Existing installation, server re-discovery (during 10s max)")
+            xbmcgui.Dialog().ok("JellyGrail", f"Reaching known server failed, server re-discovery (during 10s max)")
 
         if not listen_ssdp(monitor):
             if not xbmcgui.Dialog().yesno(
@@ -802,15 +817,33 @@ class GrailMonitor(xbmc.Monitor):
         self.debug_mode = self.addon.getSettingBool("debug_mode")
         self._realOnScan = threading.Semaphore(1)
         self._flag = threading.Event()
-        self._refresh_done = Event()
+        self._refresh_done = threading.Event() #maybe deprecated
+        self._refSem = threading.Semaphore(1)
         self._sem = threading.Semaphore(1)
         self._last_special_ops = time.time() - 10
 
-    def wait_for_refresh_done(self):
-        self._refresh_done.wait(timeout=6)
+
+
+    def refSemAcquire(self, ptimeout=6):
+        return self._refSem.acquire(timeout=ptimeout)
+    
+    def refSemRelease(self):
+        self._refSem.release()
+
+
+
+    #maybe deprecated
+    def get_ref_event(self):
+        return self._refresh_done
+
+    def wait_for_refresh_done(self, ptimeout=6):
+        self._refresh_done.wait(timeout=ptimeout)
     
     def clear_refresh_done(self):
         self._refresh_done.clear()
+
+
+
 
     def last_special_ops_call(self):
         return self._last_special_ops
@@ -853,7 +886,7 @@ class GrailMonitor(xbmc.Monitor):
     def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
         latency = 300 if self.debug_mode else 300
         if self.debug_mode or force:
-            if any((word in h.lower() for word in ["error", "warn", "fail"])):
+            if any((word in h.lower() for word in ["error", "warn", "fail", "KO"])):
                 type = xbmcgui.NOTIFICATION_ERROR
             else:
                 type = xbmcgui.NOTIFICATION_INFO
@@ -891,8 +924,9 @@ class GrailMonitor(xbmc.Monitor):
         if method == "VideoLibrary.OnUpdate":
             #self.jgnotif("Scan.NFOREFRESH", "NFOREFRESH", True)
             #xbmc.log("JellyGrail| one NFO updated", xbmc.LOGINFO)
-            xbmc.sleep(5)
-            self._refresh_done.set()
+            #xbmc.sleep(5)
+            #self._refresh_done.set()
+            self.refSemRelease()
             return
         
         if method == "Player.OnPlay":
