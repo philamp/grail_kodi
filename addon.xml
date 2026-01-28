@@ -1,7 +1,7 @@
 <addon id="context.kodi_grail"
        name="Kodi Grail Context Menu"
-       version="20260126"
-       provider-name="You">
+       version="20260128-2"
+       provider-name="philamp">
 
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
@@ -21,8 +21,8 @@
   <extension point="xbmc.service" library="init_context.py" start="startup" />
 
   <extension point="xbmc.addon.metadata">
-    <summary>Stable Grail context menu</summary>
-    <description>Forces initialization of context menu manager like Jellyfin/Plex.</description>
+    <summary>JellyGrail Add-on</summary>
+    <description>Add-on for using special JellyGrail features.</description>
     <platform>all</platform>
   </extension>
 </addon>
