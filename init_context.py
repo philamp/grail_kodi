@@ -8,6 +8,7 @@ import select
 import threading
 import zipfile
 import json
+import urllib.request
 
 
 '''
@@ -350,7 +351,6 @@ def get_typeid_with_reftype(refType):
         return "movieid"
 
 def triggerNfoRefresh(monitor, full = False):
-    xbmc.sleep(10)
 
     # else
     pbar = None
@@ -463,9 +463,24 @@ def triggerNfoRefresh(monitor, full = False):
     return
 
 def triggerScan(monitor):
-    #monitor.allowRealOnScan()
-    xbmc.sleep(100)
-    monitor.jgnotif("Scan|", "Triggered", False)
+
+    url = f"http://{monitor.addon.getSettingString("jgip")}:8085"
+
+    try:
+        with urllib.request.urlopen(url) as response:
+            if response.status != 200:
+                monitor.jgnotif("Scan|", "error contacting Nginx, cancelled", True, err = f"{e}", x = xbmc.LOGERROR)
+                monitor.semRelease()
+                return
+            else:
+                monitor.jgnotif("Scan|", "Nginx enabled", False)
+    except Exception as e:
+        monitor.jgnotif("Scan|", "error contacting Nginx", True, err = f"{e}", x = xbmc.LOGERROR)
+        monitor.semRelease()
+        return
+
+    xbmc.sleep(1000)
+    monitor.jgnotif("Scan|", "0%", False)
     xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
         
 
@@ -482,8 +497,13 @@ def uiRefresh(monitor):
     #monitor.acquireRealOnScan()
     monitor.setFlag()
     xbmc.executeJSONRPC(json.dumps(payload))
-    xbmc.sleep(5000)
-    monitor.clearFlag()
+    
+    
+    
+    #xbmc.sleep(2000)
+    #monitor.clearFlag()
+    
+    
     
     #monitor.allowRealOnScan()
 
@@ -493,7 +513,7 @@ def callSpecialOps(monitor):
 
     # additional safety to avoid multiple calls in a short time
     if time.time() - monitor.last_special_ops_call() < 5:
-        monitor.jgnotif("SpecialOps|", "Bypassed", False)
+        monitor.jgnotif("SpecialOps|", "Normal bypass failed", False)
         #monitor.allowRealOnScan()
     else:
     
@@ -815,7 +835,7 @@ class GrailMonitor(xbmc.Monitor):
         self.uid = None
         self._ignore_changes = False
         self.debug_mode = self.addon.getSettingBool("debug_mode")
-        self._realOnScan = threading.Semaphore(1)
+        self._realOnScan = threading.Semaphore(1) # maybe deprecated
         self._flag = threading.Event()
         self._refSem = threading.Semaphore(1)
         self._sem = threading.Semaphore(1)
@@ -908,14 +928,18 @@ class GrailMonitor(xbmc.Monitor):
             pass
                 
         if method == "VideoLibrary.OnScanFinished":
+
+            #if not self.acquireRealOnScan():
+            #    self.allowRealOnScan()
+            #    return
             if self._flag.is_set():
-                monitor.clearFlag()
+                self.clearFlag()
                 return
             else:
                 xbmc.sleep(3000)
                 self.semRelease()
                 # allow server loop to continue
-                monitor.jgnotif("Scan|", f"FINISHED", True)
+                monitor.jgnotif("Scan|", "100%", True)
                 callSpecialOps(self)
                 xbmc.sleep(100)
                 return
