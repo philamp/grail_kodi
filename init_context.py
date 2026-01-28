@@ -464,7 +464,7 @@ def triggerNfoRefresh(monitor, full = False):
 
 def triggerScan(monitor):
 
-    url = f"http://{monitor.addon.getSettingString("jgip")}:8085"
+    url = f"http://{monitor.addon.getSettingString('jgip')}:8085"
 
     try:
         with urllib.request.urlopen(url) as response:
