@@ -403,6 +403,12 @@ def triggerNfoRefresh(monitor, full = False):
     dtimeout = 6
     for key, val in result.get("payload").items():
         for refType, ids in val.items():
+
+
+            # todo toremove
+            #if refType != "TVShow":
+            #    continue
+
             typeid = get_typeid_with_reftype(refType)
             for id in ids:
                 
@@ -430,6 +436,10 @@ def triggerNfoRefresh(monitor, full = False):
                     dtimeout = 6
 
                 xbmc.executeJSONRPC(json.dumps(payload))
+
+
+                #xbmc.log("NFO REF PAYLOAD" + json.dumps(payload), xbmc.LOGINFO)
+
                 nfoDone += 1
 
 
@@ -461,6 +471,13 @@ def triggerNfoRefresh(monitor, full = False):
     callSpecialOps(monitor)
     
     return
+
+def triggerCleaning(monitor):
+
+    xbmc.sleep(1000)
+    monitor.jgnotif("Cleaning|", "0%", True)
+    xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Clean","params": {"showdialogs": False},"id":1}')
+    
 
 def triggerScan(monitor):
 
@@ -549,7 +566,7 @@ def askServerLoop(monitor):
             continue
 
         if result := fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
-            xbmc.log("JellyGrail| entered result", xbmc.LOGINFO)
+            #xbmc.log("JellyGrail| entered result", xbmc.LOGINFO)
 
             if result.get("scan") == True:
                 xbmc.log("JellyGrail| if scan true", xbmc.LOGINFO)
@@ -840,6 +857,7 @@ class GrailMonitor(xbmc.Monitor):
         self._refSem = threading.Semaphore(1)
         self._sem = threading.Semaphore(1)
         self._last_special_ops = time.time() - 10
+        self.cleaningDone = False
 
 
 
@@ -926,7 +944,16 @@ class GrailMonitor(xbmc.Monitor):
             #    self.jgnotif("Scan|", "STARTED", True)
             #return
             pass
-                
+
+        if method == "VideoLibrary.OnCleanFinished":
+            xbmc.sleep(3000)
+            self.semRelease()
+            callSpecialOps(self)
+            xbmc.sleep(100)
+            
+            self.jgnotif("Clean|", "100%", True)
+            return
+
         if method == "VideoLibrary.OnScanFinished":
 
             #if not self.acquireRealOnScan():
@@ -936,12 +963,16 @@ class GrailMonitor(xbmc.Monitor):
                 self.clearFlag()
                 return
             else:
-                xbmc.sleep(3000)
-                self.semRelease()
-                # allow server loop to continue
-                monitor.jgnotif("Scan|", "100%", True)
-                callSpecialOps(self)
-                xbmc.sleep(100)
+                if self.cleaningDone == False:
+                    self.cleaningDone = True
+                    triggerCleaning(self)
+                else:
+                    xbmc.sleep(3000)
+                    self.semRelease()
+                    callSpecialOps(self)
+                    xbmc.sleep(100)
+
+                self.jgnotif("Scan|", "100%", True)
                 return
 
             # Trigger your asyncio/event here
