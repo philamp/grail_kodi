@@ -350,7 +350,7 @@ def get_typeid_with_reftype(refType):
     else:
         return "movieid"
 
-def triggerNfoRefresh(monitor, full = False):
+def triggerNfoRefresh(monitor, full = False, deltamode = False):
 
     # else
     pbar = None
@@ -373,6 +373,7 @@ def triggerNfoRefresh(monitor, full = False):
     '''
 
     optfull = "&full=y" if full else ""
+    optfull = "&deltamode=y" if deltamode else optfull
 
     if not (result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}{optfull}", timeout=60)):
         monitor.jgnotif("NFOREFRESH|", "Triggered on server but no NFOs", False)
@@ -476,7 +477,7 @@ def triggerCleaning(monitor):
 
     xbmc.sleep(1000)
     monitor.jgnotif("Cleaning|", "0%", True)
-    xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Clean","params": {"showdialogs": False},"id":1}')
+    xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Clean","params": {"showdialogs": false},"id":1}')
     
 
 def triggerScan(monitor):
@@ -582,7 +583,13 @@ def askServerLoop(monitor):
             elif result.get("fullNfoRefresh") == True:
                 xbmc.log("JellyGrail| if fullnforefresh true", xbmc.LOGINFO)
                 #triggerNfoRefresh(monitor)
-                thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor, 'full': True}, daemon=True)
+                thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor, 'full': True, 'deltamode': False}, daemon=True)
+                thread.start()
+
+            elif result.get("deltaNfoRefresh") == True:
+                xbmc.log("JellyGrail| if deltanfo true", xbmc.LOGINFO)
+                #triggerNfoRefresh(monitor)
+                thread = threading.Thread(target=triggerNfoRefresh, kwargs={'monitor': monitor, 'full': False, 'deltamode': True}, daemon=True)
                 thread.start()
 
             # TODO probably useless
