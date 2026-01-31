@@ -37,7 +37,7 @@ restartAsked = False
 viaProxy = False
 
 
-def patch_sources_webdav(ipport, roots = ["movies", "shows"]):
+def patch_sources_webdav(protipport, roots = ["movies", "shows"]):
     adv_path = xbmcvfs.translatePath("special://profile/sources.xml")
 
     '''
@@ -62,7 +62,7 @@ def patch_sources_webdav(ipport, roots = ["movies", "shows"]):
     for root in roots:
         xml_block += f"""<source>
             <name>JG-{root}</name>
-            <path pathversion="1">dav://{ipport}/virtual/{root}/</path>
+            <path pathversion="1">{protipport}/virtual/{root}/</path>
             <allowsharing>true</allowsharing>
         </source>"""
 
@@ -251,7 +251,7 @@ def join_multicast(sock, mcast_addr="239.255.255.250"):
         xbmc.log(f"JellyGrail| multicast join failed: {e}", xbmc.LOGERROR)
 
 
-def get_base_or_dav_url(monitor, davPort=None):
+def get_base_or_dav_url(monitor, davPort=None, curlURL=False):
 
     jgip = monitor.addon.getSettingString("jgip")
     jgport = monitor.addon.getSettingInt("jgport")
@@ -265,6 +265,12 @@ def get_base_or_dav_url(monitor, davPort=None):
 
         return base_url
     
+    if curlURL and davPort:
+        if viaProxy:
+            return jgproxy
+        else:
+            return f"http://{jgip}:{davPort}"
+
     # else
     if viaProxy:
         if "https:" in jgproxy:
@@ -272,7 +278,7 @@ def get_base_or_dav_url(monitor, davPort=None):
         else:
             dav_url = f"{jgproxy.replace('http:', 'dav:')}"
     else:
-        dav_url = f"{jgip}:{davPort}"
+        dav_url = f"dav://{jgip}:{davPort}"
 
     return dav_url
 
@@ -322,6 +328,8 @@ def fetch_push_patch(monitor, via_proxy = False):
                     if jginfo := jgpayload.get("jginfo"):
 
                         dav_url = get_base_or_dav_url(monitor, jginfo.get("davport"))
+
+                        monitor.davport = jginfo.get("davport")
 
                         if patch_advancedsettings_mysql(jgip, jginfo.get("user"), jginfo.get("pwd"), selected, jginfo.get("port")):
                             askRestart += "(SQL settings changed)"
@@ -482,7 +490,7 @@ def triggerCleaning(monitor):
 
 def triggerScan(monitor):
 
-    url = f"http://{monitor.addon.getSettingString('jgip')}:8085"
+    url = get_base_or_dav_url(monitor, davPort=monitor.davport, curlURL=True)
 
     try:
         with urllib.request.urlopen(url) as response:
@@ -859,12 +867,13 @@ class GrailMonitor(xbmc.Monitor):
         self.uid = None
         self._ignore_changes = False
         self.debug_mode = self.addon.getSettingBool("debug_mode")
-        self._realOnScan = threading.Semaphore(1) # maybe deprecated
+        #self._realOnScan = threading.Semaphore(1) # maybe deprecated
         self._flag = threading.Event()
         self._refSem = threading.Semaphore(1)
         self._sem = threading.Semaphore(1)
         self._last_special_ops = time.time() - 10
         self.cleaningDone = False
+        self.davport = None
 
 
 
