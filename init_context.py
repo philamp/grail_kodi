@@ -1042,21 +1042,14 @@ if __name__ == "__main__":
         xbmcaddon.Addon().openSettings()
     else:
         if dbVerified and not restartAsked:
+            xbmc.sleep(3000) # sometimes kodi is not completey started and scan call fails, so we wait a bit before starting the loop that listen to server orders, so we are sure to not miss the first scan order if there is one at startup                
             monitor.jgnotif("READY?|", "YES!", True)
-
-
             monitor.jgnotif("Too many notifs?", "disable debug in addon settings", False)
             askServerLoop(monitor)
 
         else:
             monitor.jgnotif("READY?|", "NO!, RESTART KODI", True)
-            # long polling service....
-            # what_should_i_do
-            # -status
-            # -action
 
-
-         # display only if debug mode
 
     while not monitor.abortRequested():
         # oportunity to make periodic tasks if needed
@@ -1064,89 +1057,3 @@ if __name__ == "__main__":
             # Abort was requested while waiting. We should exit
             break
 
-    '''
-    if addon.getSettingBool("override_ssdp_settings"):
-        xbmcgui.Dialog().notification(
-            "KodiGrail| S2: SSDP ignored",
-            f"Manual settings used",
-            xbmcgui.NOTIFICATION_INFO,
-            1500
-        )
-    else:
-        thread = threading.Thread(target=listen_ssdp, kwargs={'monitor': monitor, 'port': 6505, 'mcast_addr': "239.255.255.250", 'duration': 20}, daemon=True)
-        thread.start()
-    '''
-
-    #xbmc.log("JellyGrail| init_context service started", xbmc.LOGINFO)
-
-    # On attend la fin du service ou l'arrêt Kodi (la boucle principale reste utile si tu veux garder le service vivant)
-
-
-
-    #while not monitor.waitForAbort(0.5):
-    #    pass
-
-    #while not monitor.abortRequested():
-    #    xbmc.sleep(500)
-
-'''
-def install_addon_from_dav(dav_url, local_filename=None):
-    """
-    Télécharge un fichier ZIP d'addon depuis une URL WebDAV et l'installe dans Kodi.
-    Exemple : dav_url = "dav://user:pass@192.168.0.10/addons/plugin.video.foo.zip"
-    """
-
-    try:
-        # Si pas de nom local précisé, extraire le nom depuis l’URL
-        if not local_filename:
-            local_filename = os.path.basename(dav_url)
-
-        # Emplacement temporaire (le cache Kodi est accessible en écriture)
-        temp_dir = xbmcvfs.translatePath("special://home/cache/")
-        local_path = os.path.join(temp_dir, local_filename)
-
-        xbmc.log(f"JellyGrail| Téléchargement depuis {dav_url} vers {local_path}", xbmc.LOGINFO)
-
-        # Lecture via xbmcvfs (Kodi gère WebDAV)
-        src_file = xbmcvfs.File(dav_url, 'rb')
-        dest_file = xbmcvfs.File(local_path, 'wb')
-
-        buffer_size = 1024 * 1024  # 1 Mo
-        while True:
-            data = src_file.read(buffer_size)
-            if not data:
-                break
-            dest_file.write(data)
-
-        src_file.close()
-        dest_file.close()
-
-        xbmc.log(f"JellyGrail| Téléchargement terminé : {local_path}", xbmc.LOGINFO)
-
-        # Installation de l'addon depuis le ZIP téléchargé
-        xbmc.log(f"JellyGrail| Installation de {local_path}", xbmc.LOGINFO)
-        xbmc.executebuiltin(f'InstallAddonFromZip("{local_path}")')
-
-        xbmcgui.Dialog().notification("Kodi Grail", f"Addon installé depuis {dav_url}", time=4000)
-        return True
-
-    except Exception as e:
-        xbmc.log(f"JellyGrail| Erreur lors du téléchargement/installation: {e}", xbmc.LOGERROR)
-        xbmcgui.Dialog().notification("Kodi Grail", f"Erreur: {e}", time=5000)
-        return False
-'''
-
-'''
-def install_addon_from_http(url):
-    temp_path = xbmc.translatePath("special://home/cache/")
-    local_zip = os.path.join(temp_path, os.path.basename(url))
-
-    xbmc.log(f"JellyGrail| Téléchargement direct HTTP depuis {url}", xbmc.LOGINFO)
-
-    try:
-        urllib.request.urlretrieve(url, local_zip)
-        xbmc.log(f"JellyGrail| Téléchargement terminé : {local_zip}", xbmc.LOGINFO)
-        xbmc.executebuiltin(f'InstallAddonFromZip("{local_zip}")')
-    except Exception as e:
-        xbmc.log(f"JellyGrail| Erreur téléchargement HTTP : {e}", xbmc.LOGERROR)
-'''
