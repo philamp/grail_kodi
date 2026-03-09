@@ -473,9 +473,10 @@ def triggerNfoRefresh(monitor, full = False, deltamode = False):
     pbar.update(100, message=f"{nfoDone}/{nfoTotal}")
 
     #monitor.semRelease()
-    xbmc.sleep(100)
+    
     monitor.jgnotif("NFOREFRESH|", "Completed", True)
     pbar.close()
+    xbmc.sleep(3000)
     monitor.semRelease()
     callSpecialOps(monitor)
     
@@ -483,8 +484,8 @@ def triggerNfoRefresh(monitor, full = False, deltamode = False):
 
 def triggerCleaning(monitor):
 
-    xbmc.sleep(1000)
     monitor.jgnotif("Cleaning|", "0%", True)
+    xbmc.sleep(100)
     xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Clean","params": {"showdialogs": false},"id":1}')
     
 
@@ -505,8 +506,8 @@ def triggerScan(monitor):
         monitor.semRelease()
         return
 
-    xbmc.sleep(1000)
     monitor.jgnotif("Scan|", "0%", False)
+    xbmc.sleep(100)
     xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
         
 
@@ -522,6 +523,7 @@ def uiRefresh(monitor):
     #ui refresh should not set refreshworking to false nor call again specialops in loop
     #monitor.acquireRealOnScan()
     monitor.setFlag()
+    xbmc.sleep(100)
     xbmc.executeJSONRPC(json.dumps(payload))
     
     
@@ -558,7 +560,7 @@ def callSpecialOps(monitor):
         else:
             monitor.jgnotif("SpecialOps|", "Error contacting server", True)
 
-    
+    #xbmc.sleep(100)
     
     #monitor.allowRealOnScan()
 
@@ -779,54 +781,6 @@ def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
                             
 
 
-                            
-                            '''
-                            # we get the rest via WS and we give the token given by SSDP
-
-                            # WSdesign is:
-                            # - POST to /kodi_login with add-on instance UUDID
-                            uuid = get_installation_uid(monitor.addon)
-                            # - and token from SSDP 
-                            ssdp_token = msga[6]
-                            # - and KODIversion
-                            kodiverison = kodi_version()
-
-                            local_ip = guess_ip()
-
-                            # we have the port for SQL in SSDP -> advsettings
-                            xbmc.log(f"JellyGrail| UUID:{uuid}, SSDP_TOKEN: {ssdp_token}, kodiverison: {kodiverison}", xbmc.LOGINFO)
-
-                            BASE_URL = f"http://{addr[0]}:{msga[3]}/api"
-
-                            BASE_IDENT = f"?token={ssdp_token}&kodi_version={kodiverison}&uid={uuid}&ip={local_ip}"
-                            
-                            ##uid##choice##ip##kodi_version
-                            # - JG responds with a list(S) of possible databases + new db (or just one if it recognizes the UUID)
-                            # - so the seed is always given by JG
-                            # - (we select one if many) and store it in advsettings.xml
-
-                            jginfo = fetch_mysql_info(f"{BASE_URL}/get_compatible_kodiDBs{BASE_IDENT}")
-                            if not jginfo:
-                                xbmcgui.Dialog().ok("JellyGrail", "No DB returned by the server.")
-                                return
-                            if dbs := jginfo.get("avail_dbs"):
-                                selected = select_mysql_db(dbs)
-                            if selected:
-                                send_choice_to_server(f"{BASE_URL}/set_db_for_this_kodi{BASE_IDENT}&choice={selected}")
-                                xbmc.log(f"JellyGrail| Selected DB : {selected}", xbmc.LOGINFO)
-                        
-                            
-
-                            if mysqlinfo := jginfo.get("jginfo"):
-                            # - when storing in advanced settings, we check for c
-                            # host, user, password, dbnameprefix, port):
-                                # this is a POC
-                                if patch_advancedsettings_mysql(addr[0], mysqlinfo.get("user"), mysqlinfo.get("pwd"), selected, mysqlinfo.get("port")):
-                                    askUserRestart("(userdata/advancedsettings.xml updated)")
-                            '''
-
-                            
-
 
 
                     else:
@@ -965,7 +919,6 @@ class GrailMonitor(xbmc.Monitor):
             xbmc.sleep(3000)
             self.semRelease()
             callSpecialOps(self)
-            xbmc.sleep(100)
             
             self.jgnotif("Clean|", "100%", True)
             return
@@ -979,14 +932,13 @@ class GrailMonitor(xbmc.Monitor):
                 self.clearFlag()
                 return
             else:
+                xbmc.sleep(3000)
                 if self.cleaningDone == False:
                     self.cleaningDone = True
                     triggerCleaning(self)
                 else:
-                    xbmc.sleep(3000)
                     self.semRelease()
                     callSpecialOps(self)
-                    xbmc.sleep(100)
 
                 self.jgnotif("Scan|", "100%", True)
                 return
