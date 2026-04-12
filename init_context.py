@@ -220,6 +220,7 @@ def preload_context():
 
 def guess_ip():
     try:
+        s = None
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         iface_ip = s.getsockname()[0]
@@ -343,7 +344,7 @@ def fetch_push_patch(monitor, via_proxy = False):
                             monitor.jgnotif("Real-Debrid|", f"{jginfo.get('pdays')} remaining", True)
                         
                         return True
-    
+    viaProxy = False
     return False
 
 
@@ -384,11 +385,11 @@ def triggerNfoRefresh(monitor, full = False, deltamode = False):
     optfull = "&deltamode=y" if deltamode else optfull
 
     if not (result := fetch_jg_info(monitor, base_url, "/gimme_nfos", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}{optfull}", timeout=60)):
-        monitor.jgnotif("NFOREFRESH|", "Triggered on server but no NFOs", False)
+        monitor.jgnotif("Metadatas|", "Triggered on server but no NFOs", False)
         monitor.semRelease()
         return
     
-    monitor.jgnotif("NFOREFRESH|", "(screen may flicker)", False)
+    monitor.jgnotif("Metadatas|", "Refresh (screen may flicker)", True)
     # else
 
     nfoTotal = 0
@@ -420,7 +421,7 @@ def triggerNfoRefresh(monitor, full = False, deltamode = False):
 
             typeid = get_typeid_with_reftype(refType)
             for id in ids:
-                
+                # only if there are ids, so when nfototal is > 0, so no possibility to have division by zero.
                 if pbar:
                     i = nfoDone / nfoTotal * 100
                     pbar.update(int(i), message=f"{nfoDone}/{nfoTotal}")
@@ -437,11 +438,11 @@ def triggerNfoRefresh(monitor, full = False, deltamode = False):
 
                 if not monitor.refSemAcquire(ptimeout=dtimeout):
                     if(nfoDone == 1):
-                        monitor.jgnotif("NFOREFRESH|", f"Semaphore fail, set short timeout", True)
+                        monitor.jgnotif("Metadatas|", f"Semaphore fail, set short timeout", True)
                     dtimeout = 1
                 else:
                     if(nfoDone == 1):
-                        monitor.jgnotif("NFOREFRESH|", f"Semaphore OK", False)
+                        monitor.jgnotif("Metadatas|", f"Semaphore OK", False)
                     dtimeout = 6
 
                 xbmc.executeJSONRPC(json.dumps(payload))
@@ -496,18 +497,18 @@ def triggerScan(monitor):
     try:
         with urllib.request.urlopen(url) as response:
             if response.status != 200:
-                monitor.jgnotif("Scan|", "error contacting Nginx, cancelled", True, err = f"{e}", x = xbmc.LOGERROR)
+                monitor.jgnotif("Scan|", "Http error contacting WebDAV", True, err = f"{response.status}", x = xbmc.LOGERROR)
                 monitor.semRelease()
                 return
             else:
-                monitor.jgnotif("Scan|", "Nginx enabled", False)
+                monitor.jgnotif("Scan|", "WebDAV source detected", True)
     except Exception as e:
-        monitor.jgnotif("Scan|", "error contacting Nginx", True, err = f"{e}", x = xbmc.LOGERROR)
+        monitor.jgnotif("Scan|", "WebDAV server absent", True, err = f"{e}", x = xbmc.LOGERROR)
         monitor.semRelease()
         return
 
-    monitor.jgnotif("Scan|", "0%", False)
-    xbmc.sleep(100)
+    monitor.jgnotif("Scan|", "Starting shortly...", True)
+    xbmc.sleep(3000)
     xbmc.executeJSONRPC('{"jsonrpc":"2.0","method":"VideoLibrary.Scan","id":1}')
         
 
@@ -525,6 +526,8 @@ def uiRefresh(monitor):
     monitor.setFlag()
     xbmc.sleep(100)
     xbmc.executeJSONRPC(json.dumps(payload))
+    xbmc.sleep(100)
+    monitor.jgnotif("View|", "Refreshed", True)
     
     
     
@@ -556,7 +559,7 @@ def callSpecialOps(monitor):
                 monitor.jgnotif("SpecialOps|", "Completed", False)
                 uiRefresh(monitor)
             else:
-                monitor.jgnotif("SpecialOps|", "No ops to do", False)
+                monitor.jgnotif("SpecialOps|", "Not needed", False)
         else:
             monitor.jgnotif("SpecialOps|", "Error contacting server", True)
 
@@ -570,14 +573,40 @@ def askServerLoop(monitor):
 
     base_url = get_base_or_dav_url(monitor)
 
+
+    if not dbVerified or restartAsked:
+        monitor.jgnotif("Startup|", "Needs Kodi restart", True)
+        return
+
+    monitor.jgnotif("Startup|", "Completed", True)
+    monitor.jgnotif("Too many notifs?", "disable debug in addon settings", False)
+
+    # sometimes kodi is not completey started and scan call fails, so we wait a bit before starting the loop that listen to server orders, so we are sure to not miss the first scan order if there is one at startup                
+    xbmc.sleep(3000)
     while not monitor.abortRequested() and dbVerified is not None:
         #break #TODO temp toremove
         xbmc.sleep(100) #wait 0.1s between loops
+
+        if monitor.isLastContactEarlierThan30min():
+            if xbmcgui.Dialog().yesno(
+                heading="JellyGrail not receiving completion status",
+                message="It's been more than 30mn waiting for a completion status from the Kodi scanning task, is it still running or done ?",
+                #line2="Continue discovering or stop and open config ?",
+                nolabel="Task still running",
+                yeslabel="Task is done"
+            ):
+                monitor.semRelease()
+            
+            monitor.setLastContact()
+
         if not monitor.semAcquire():
             continue
 
+
         if result := fetch_jg_info(monitor, base_url, "/what_should_do", get_base_ident_params(monitor, jgtoken), f"&db={dbVerified}", timeout=15):
             #xbmc.log("JellyGrail| entered result", xbmc.LOGINFO)
+
+            monitor.setLastContact()
 
             if result.get("scan") == True:
                 xbmc.log("JellyGrail| if scan true", xbmc.LOGINFO)
@@ -612,10 +641,12 @@ def askServerLoop(monitor):
                 monitor.semRelease()
 
         else:
-            monitor.jgnotif("Error|", "Critical: server broken", True)
-            askUserRestart("Jellygrail Server broken, please restart it as well")
+            monitor.jgnotif("Error|", "Connection broken", True)
+            monitor.semRelease()
+            #askUserRestart("Jellygrail connection lost, restart Kodi to try to reconnect (and verify server is up)")
             break
 
+    return False
 
 
 
@@ -628,61 +659,62 @@ def init(monitor):
     jgtoken = monitor.addon.getSettingString("jgtoken")
     jgproxy = monitor.addon.getSettingString("jgproxy")
 
-    success = False
     tries = 1
-
+    
     config_set = jgip != "0.0.0.0" and jgport != 0 and jgtoken != "0"
 
-    # -------
+    while not monitor.abortRequested():
 
-    while not success:
+        tempDeconnect = False # switch to behave differently if it's a disconnect or a first attempt. A disconnect will usually not need another SSDP listen since the server was known.
 
-        if config_set or tries > 1:
+        if config_set:
+            monitor.jgnotif("Startup|", "Connecting to JG server...", True)
             if fetch_push_patch(monitor, False): # noproxy
-                success = True
-                break
+                if not askServerLoop(monitor):
+                    tempDeconnect = True
 
         
-        if jgproxy != "0" and tries == 1:  #Only once after the fail because SSDP wont need proxy
+            elif tries > 1 and jgproxy != "0":  #Only once after the fail because SSDP wont need proxy
 
-            if xbmcgui.Dialog().yesno(
-                heading="JellyGrail Server Connection",
-                message="Accessing the server via HTTP on Local network failed, Do you want to try the provided proxy fallback ?",
-                nolabel="No",
-                yeslabel="Yes"
-            ):
-                if fetch_push_patch(monitor, True): # via proxy
-                    success = True
-                    break
+                if xbmcgui.Dialog().yesno(
+                    heading="JellyGrail Server Connection",
+                    message="Accessing the server via HTTP on Local network failed, Do you want to try the provided proxy fallback ?",
+                    nolabel="No",
+                    yeslabel="Yes"
+                ):
+                    monitor.jgnotif("Startup|", "Connecting to proxy JG server...", True)
+                    if fetch_push_patch(monitor, True): # via proxy
+                        if not askServerLoop(monitor):
+                            tempDeconnect = True
 
 
-        if not config_set:
-            xbmcgui.Dialog().ok("JellyGrail", f"New installation, server discovery (during 10s max)")
+            if tempDeconnect:
+                monitor.jgnotif("Server|", "Connection lost, reconnecting...", True)
+            else:
+                xbmcgui.Dialog().ok("JellyGrail", f"Reaching known server failed, server re-discovery (during 10s max)")
+
         else:
-            xbmcgui.Dialog().ok("JellyGrail", f"Reaching known server failed, server re-discovery (during 10s max)")
+            xbmcgui.Dialog().ok("JellyGrail", f"New installation, server discovery (during 10s max)")
+            
 
-        if not listen_ssdp(monitor):
-            if not xbmcgui.Dialog().yesno(
-                heading="JellyGrail Server Connection",
-                message="Do you want to continue trying to connect to JellyGrail server or open manual settings ?",
-                #line2="Continue discovering or stop and open config ?",
-                nolabel="Open manual settings",
-                yeslabel="Continue trying"
-            ):
-                break
+        if not tempDeconnect:
+            monitor.jgnotif("Startup|", "Detecting JG server...", True)
+            if not listen_ssdp(monitor) and tries > 1: # Don't bother the user on the first fail, since it can be normal if the server is just starting and SSDP is not instant
+                if not xbmcgui.Dialog().yesno(
+                    heading="JellyGrail server connection",
+                    message="Do you want to continue trying to connect to JellyGrail server or open manual settings ?",
+                    #line2="Continue discovering or stop and open config ?",
+                    nolabel="Open manual settings",
+                    yeslabel="Continue trying"
+                ):
+                    break
     
         tries += 1
     
-    # ------
-    
-    if success:
-        monitor.jgnotif("Startup|", "Successful", False)
-        return True
-    else:
-        monitor.jgnotif("Startup|", "Failed, opening config", True)
-        return False
+    monitor.jgnotif("Startup|", "Failed", True)    
+    xbmcaddon.Addon().openSettings()
+    return False
 
-    # -----------
 
     # if VERSION mismatch ? TODO
 
@@ -692,7 +724,7 @@ def init(monitor):
 #  Écoute SSDP (avec durée limitée)
 # ==============================
 def listen_ssdp(monitor, port=1900, mcast_addr="239.255.255.250", duration=10):
-    
+    sock = None
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -828,6 +860,7 @@ class GrailMonitor(xbmc.Monitor):
         self._last_special_ops = time.time() - 10
         self.cleaningDone = False
         self.davport = None
+        self._last_server_contact = time.time()
 
 
 
@@ -837,7 +870,11 @@ class GrailMonitor(xbmc.Monitor):
     def refSemRelease(self):
         self._refSem.release()
 
+    def setLastContact(self):
+        self._last_server_contact = time.time()
 
+    def isLastContactEarlierThan30min(self):
+        return time.time() - self._last_server_contact > 1800
 
     #maybe deprecated
     '''
@@ -895,7 +932,7 @@ class GrailMonitor(xbmc.Monitor):
     def jgnotif(self, h, p, force = False, x = xbmc.LOGINFO, err = ""):
         latency = 300 if self.debug_mode else 300
         if self.debug_mode or force:
-            if any((word in h.lower() for word in ["error", "warn", "fail", "KO"])):
+            if any((word in p.lower() for word in ["error", "warn", "fail", "absent", "lost", "critical"])):
                 type = xbmcgui.NOTIFICATION_ERROR
             else:
                 type = xbmcgui.NOTIFICATION_INFO
@@ -920,7 +957,7 @@ class GrailMonitor(xbmc.Monitor):
             self.semRelease()
             callSpecialOps(self)
             
-            self.jgnotif("Clean|", "100%", True)
+            self.jgnotif("Clean|", "Completed", True)
             return
 
         if method == "VideoLibrary.OnScanFinished":
@@ -932,6 +969,7 @@ class GrailMonitor(xbmc.Monitor):
                 self.clearFlag()
                 return
             else:
+                self.jgnotif("Scan|", "Completed", True)
                 xbmc.sleep(3000)
                 if self.cleaningDone == False:
                     self.cleaningDone = True
@@ -939,8 +977,6 @@ class GrailMonitor(xbmc.Monitor):
                 else:
                     self.semRelease()
                     callSpecialOps(self)
-
-                self.jgnotif("Scan|", "100%", True)
                 return
 
             # Trigger your asyncio/event here
@@ -950,6 +986,8 @@ class GrailMonitor(xbmc.Monitor):
             #xbmc.log("JellyGrail| one NFO updated", xbmc.LOGINFO)
             #xbmc.sleep(5)
             #self._refresh_done.set()
+            #payload = json.loads(data)
+
             self.refSemRelease()
             return
         
@@ -959,6 +997,7 @@ class GrailMonitor(xbmc.Monitor):
 
         if method == "Player.OnStop":
             self.jgnotif("Player|", "STOP", True)
+            xbmc.sleep(3000)
             callSpecialOps(self)
             return
 
@@ -981,26 +1020,26 @@ class GrailMonitor(xbmc.Monitor):
         askUserRestart()
 
 # ==============================
-#  Point d'entrée principal
+#  MAIN
 # ==============================
 if __name__ == "__main__":
     preload_context()
     addon = xbmcaddon.Addon(id="context.kodi_grail")
     monitor = GrailMonitor(addon)
 
-    monitor.jgnotif("Loading|", "Detecting/Connecting JellyGrail server...", True)
+    init(monitor)
 
-    if not init(monitor):
-        xbmcaddon.Addon().openSettings()
+    '''
     else:
         if dbVerified and not restartAsked:
             xbmc.sleep(3000) # sometimes kodi is not completey started and scan call fails, so we wait a bit before starting the loop that listen to server orders, so we are sure to not miss the first scan order if there is one at startup                
-            monitor.jgnotif("READY?|", "YES!", True)
+            monitor.jgnotif("READY?|", "YES!", False)
             monitor.jgnotif("Too many notifs?", "disable debug in addon settings", False)
             askServerLoop(monitor)
 
         else:
             monitor.jgnotif("READY?|", "NO!, RESTART KODI", True)
+    '''
 
 
     while not monitor.abortRequested():

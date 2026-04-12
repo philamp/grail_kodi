@@ -139,7 +139,7 @@ def run():
                     base_url = get_base_urlCT(addon)
                     # full nfo refreshcall
                     if fetch_jg_infoCT(base_url, "/trigger_full_nfo_refresh", get_base_ident_paramsCT(addon), None):
-                        jgnotifCT("Full NFO Refresh", "Triggered", True)
+                        jgnotifCT("Full NFO Refresh", "Manually triggered", True)
                         
                         xbmc.executebuiltin('ActivateWindow(Settings)')
                         xbmc.sleep(2000)
@@ -151,7 +151,7 @@ def run():
                     base_url = get_base_urlCT(addon)
                     # full nfo refreshcall
                     if fetch_jg_infoCT(base_url, "/trigger_full_nfo_refresh", get_base_ident_paramsCT(addon), "&deltamode=y"):
-                        jgnotifCT("Delta NFO Refresh", "Triggered", True)
+                        jgnotifCT("Delta NFO Refresh", "Manually triggered", True)
                         
                         xbmc.executebuiltin('ActivateWindow(Settings)')
                         xbmc.sleep(2000)
@@ -164,7 +164,7 @@ def run():
                     base_url = get_base_urlCT(addon)
                     # full scan call
                     if fetch_jg_infoCT(base_url, "/ask_kodi_refresh", get_base_ident_paramsCT(addon), None):
-                        jgnotifCT("Full Scan", "Triggered", True)
+                        jgnotifCT("Full Scan", "Manually triggered", True)
                 return
 
 
