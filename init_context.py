@@ -341,7 +341,8 @@ def fetch_push_patch(monitor, via_proxy = False):
                             monitor.jgnotif("Config change", "Will be applied after restart", True)
                         else:
                             monitor.jgnotif("No Config change", "No restart needed", False)
-                            monitor.jgnotif("Real-Debrid|", f"{jginfo.get('pdays')} remaining", True)
+                            monitor.jgnotif("Real-Debrid|", f"{jginfo.get('pdays', '0')} remaining", True)
+                            monitor.jgnotif("TorBox|", f"{jginfo.get('tbpdays', '0')} remaining", True)
                         
                         return True
     viaProxy = False
@@ -573,10 +574,10 @@ def askServerLoop(monitor):
 
     base_url = get_base_or_dav_url(monitor)
 
-
+    
     if not dbVerified or restartAsked:
         monitor.jgnotif("Startup|", "Needs Kodi restart", True)
-        return
+        return False
 
     monitor.jgnotif("Startup|", "Completed", True)
     monitor.jgnotif("Too many notifs?", "disable debug in addon settings", False)
@@ -664,6 +665,12 @@ def init(monitor):
     config_set = jgip != "0.0.0.0" and jgport != 0 and jgtoken != "0"
 
     while not monitor.abortRequested():
+
+        if restartAsked:
+            monitor.jgnotif("Startup|", "Restart needed to apply changes, restarting...", True)
+            xbmc.sleep(20)
+            xbmc.executebuiltin("RestartApp")
+            return False
 
         tempDeconnect = False # switch to behave differently if it's a disconnect or a first attempt. A disconnect will usually not need another SSDP listen since the server was known.
 
@@ -1047,4 +1054,3 @@ if __name__ == "__main__":
         if monitor.waitForAbort(5):
             # Abort was requested while waiting. We should exit
             break
-

@@ -32,6 +32,69 @@ def setConfigToDefaults(addon):
 
         xbmc.log(f"[GrailContext] ERROR setting default for {key}: {e}", xbmc.LOGERROR)
 
+def uninstall():
+    adv_path = xbmcvfs.translatePath("special://profile/advancedsettings.xml")
+
+    if not xbmcvfs.exists(adv_path):
+        xbmc.log("[GrailContext] advancedsettings.xml absent, nothing to uninstall", xbmc.LOGINFO)
+        return False
+
+    with xbmcvfs.File(adv_path) as f:
+        content = f.read()
+
+    import re
+    new_content = re.sub(
+        r"\s*<videodatabase\b[^>]*>.*?</videodatabase>\s*",
+        "",
+        content,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    if new_content.strip() == content.strip():
+        xbmc.log("[GrailContext] NO videodatabase block in adv settings", xbmc.LOGINFO)
+        return False
+
+    xbmc.log("[GrailContext] REMOVING videodatabase block from adv settings", xbmc.LOGINFO)
+    with xbmcvfs.File(adv_path, "w") as f:
+        f.write(new_content)
+
+    return True
+
+def disable_addon(addon_id="context.kodi_grail"):
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "Addons.SetAddonEnabled",
+        "params": {
+            "addonid": addon_id,
+            "enabled": False
+        }
+    }
+
+    try:
+        result = json.loads(xbmc.executeJSONRPC(json.dumps(payload)))
+    except Exception as e:
+        xbmc.log(f"[GrailContext] ERROR disabling addon {addon_id}: {e}", xbmc.LOGERROR)
+        return False
+
+    if "error" in result:
+        xbmc.log(f"[GrailContext] ERROR disabling addon {addon_id}: {result['error']}", xbmc.LOGERROR)
+        return False
+
+    xbmc.log(f"[GrailContext] disabled addon {addon_id}", xbmc.LOGINFO)
+    return True
+
+def open_addon_description_window(addon_id="context.kodi_grail"):
+    try:
+        xbmc.executebuiltin(f"ActivateWindow(AddonBrowser,addons://user/xbmc.service/{addon_id},return)")
+        xbmc.sleep(500)
+        xbmc.executebuiltin("Action(Info)")
+        xbmc.log(f"[GrailContext] opened addon description window for {addon_id}", xbmc.LOGINFO)
+        return True
+    except Exception as e:
+        xbmc.log(f"[GrailContext] ERROR opening addon description window for {addon_id}: {e}", xbmc.LOGERROR)
+        return False
+
 '''
 def safe_get(index, default=None):
     try:
@@ -132,6 +195,8 @@ def run():
             dialog = xbmcgui.Dialog()
             resp = dialog.contextmenu(menu)
 
+            if resp == -1 or resp >= len(selectable):
+                return
 
 
             if selectable[resp] == '#FULLNFOREFRESH':
@@ -178,6 +243,17 @@ def run():
                     setConfigToDefaults(addon)
                     jgnotifCT("Add-on config", "Reinitialized", True)
                     askUserRestartCT("Add-on reset")
+                return
+
+            if selectable[resp] == '#UNINSTALL':
+                if confirmPopinCT("Uninstall JellyGrail config", "Remove the JellyGrail video database settings from advancedsettings.xml? You will need to restart Kodi."):
+                    if uninstall():
+                        jgnotifCT("Add-on config", "Video database removed", True)
+                    else:
+                        jgnotifCT("Add-on config", "No video database settings found", True)
+                    disable_addon()
+                    open_addon_description_window()
+                    askUserRestartCT("JellyGrail database settings removed")
                 return
         
 
