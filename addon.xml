@@ -1,6 +1,6 @@
 <addon id="context.kodi_grail"
        name="Kodi Grail Context Menu"
-       version="20260610"
+       version="v1.4.0"
        provider-name="philamp">
 
   <requires>

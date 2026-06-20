@@ -3,7 +3,7 @@ name: Build Kodi add-on zip
 on:
   push:
     tags:
-      - "2026*"
+      - 'v*.*.*'
 
 permissions:
   contents: write

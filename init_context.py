@@ -343,6 +343,7 @@ def fetch_push_patch(monitor, via_proxy = False):
                             monitor.jgnotif("No Config change", "No restart needed", False)
                             monitor.jgnotif("Real-Debrid|", f"{jginfo.get('pdays', '0')} remaining", True)
                             monitor.jgnotif("TorBox|", f"{jginfo.get('tbpdays', '0')} remaining", True)
+                            monitor.jgnotif("Premiumize|", f"{jginfo.get('pmdays', '0')} remaining", True)
                         
                         return True
     viaProxy = False
@@ -413,6 +414,7 @@ def triggerNfoRefresh(monitor, full = False, deltamode = False):
 
     dtimeout = 6
     for key, val in result.get("payload").items():
+        xbmc.sleep(10)
         for refType, ids in val.items():
 
 
