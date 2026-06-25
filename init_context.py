@@ -37,7 +37,7 @@ restartAsked = False
 viaProxy = False
 
 
-def patch_sources_webdav(protipport, roots = ["movies", "shows"]):
+def patch_sources_webdav(protipport, roots = ["movies", "shows", "Blurays", "DVDs"]):
     adv_path = xbmcvfs.translatePath("special://profile/sources.xml")
 
     '''
