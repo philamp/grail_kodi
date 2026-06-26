@@ -717,6 +717,8 @@ def init(monitor):
                     yeslabel="Continue trying"
                 ):
                     break
+            else:
+                config_set = True
     
         tries += 1
     
